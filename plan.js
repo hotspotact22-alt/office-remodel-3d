@@ -19,7 +19,7 @@ export default {
   name: 'Suite 7 Office — Modern Corporate',
   placeholder: false,
   // Change this whenever this file changes: browsers that saved an older version are offered the new room.
-  version: '2026-11-06-corporate',
+  version: '2026-11-06-corporate-finishes',
 
   ceilingHeight: 2.39,     // 7′10″
   wallThickness: 0.12,
@@ -44,6 +44,8 @@ export default {
   // Wall n runs from corner n to corner n+1: 0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K.
   // F is exposed brick; the window walls are brick around the glass.
   finishes: { default: 'plaster', 5: 'brick', 6: 'brick', 8: 'brick', 9: 'brick' },
+  ceilingFinish: 'tiles',  // white 2′ acoustic ceiling tiles
+  floorFinish: 'carpet',   // charcoal commercial carpet
 
   // Openings: offset = distance from the wall's start corner to the opening's near edge.
   // The first door is treated as the main entry.
