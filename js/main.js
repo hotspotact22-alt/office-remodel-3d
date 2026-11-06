@@ -315,14 +315,41 @@ function ensurePathTracer() {
   pathTracer.renderScale = window.devicePixelRatio > 1.25 ? 0.75 : 1;
 }
 
+// The path tracer can only light from an equirectangular sky. If the HDRI could not download
+// (offline, or a host that blocks it), the live view keeps its studio cube, which the path
+// tracer cannot read, so Photo gets a soft generated sky instead.
+let skyFallback = null;
+function photoEnvironment() {
+  if (hdr) return hdr;
+  if (!skyFallback) {
+    const w = 64, h = 32, data = new Uint8Array(w * h * 4);
+    const top = [214, 226, 240], horizon = [246, 244, 238], ground = [150, 142, 132];
+    for (let j = 0; j < h; j++) {   // row 0 is the bottom (v = 0): ground, then horizon, then sky
+      const t = 1 - j / (h - 1), c = t < 0.5 ? top.map((v, k) => v + (horizon[k] - v) * (t / 0.5)) : horizon.map((v, k) => v + (ground[k] - v) * ((t - 0.5) / 0.5));
+      for (let i = 0; i < w; i++) data.set([...c.map(Math.round), 255], (j * w + i) * 4);
+    }
+    skyFallback = new THREE.DataTexture(data, w, h);
+    skyFallback.mapping = THREE.EquirectangularReflectionMapping;
+    skyFallback.colorSpace = THREE.SRGBColorSpace;
+    skyFallback.needsUpdate = true;
+  }
+  return skyFallback;
+}
+let liveEnvironment = null;
+function usePhotoEnvironment(on) {
+  if (on) { liveEnvironment = scene.environment; scene.environment = photoEnvironment(); }
+  else if (liveEnvironment) { scene.environment = hdr ?? liveEnvironment; liveEnvironment = null; }
+}
+
 // Compile the path-tracing shader in the background once the page is idle, so the
 // first Photo render starts in seconds instead of ~30 s.
 async function prewarmPathTracer() {
   await Promise.all([M.ready, loadHDR(lighting)]);
   if (photo) return;
   ensurePathTracer();
-  pathTracer.setScene(scene, camera);
-  pathTracer.renderSample();
+  usePhotoEnvironment(true);
+  try { pathTracer.setScene(scene, camera); pathTracer.renderSample(); }
+  finally { usePhotoEnvironment(false); }
 }
 
 async function startPhoto() {
@@ -351,6 +378,7 @@ async function startPhoto() {
   setStatus('Preparing scene…');
   await new Promise((r) => setTimeout(r, 50));          // let the status paint before the blocking build
   if (!photo) return;                                    // cancelled meanwhile: skip the multi-second build
+  usePhotoEnvironment(true);
   pathTracer.setScene(scene, camera);
   if (!photo) return;
   ptReady = true;
@@ -363,6 +391,7 @@ function stopPhoto() {
   photoHidden = [];
   photoSwapped.forEach((o) => (o.material = M.glass));
   photoSwapped = [];
+  usePhotoEnvironment(false);
   if (selBox) selBox.visible = true;
   const m = lightMode();
   scene.environmentIntensity = m.env;
