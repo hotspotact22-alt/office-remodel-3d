@@ -496,6 +496,18 @@ function updateHint() {
       : (LOW ? 'Drag to orbit · pinch to zoom · tap a piece to select it' : 'Drag to orbit · scroll to zoom · right-drag to pan · click a piece to select it, then drag it');
 }
 
+// After walls move, a saved eye-level spot can sit outside the room (and walking would be
+// blocked there): step it in toward the middle, a little past the wall.
+function eyeInside([x, z]) {
+  const { room, center: c } = world, at = (k) => [x + (c.x - x) * k, z + (c.z - z) * k];
+  if (room.contains(x, z)) return [x, z];
+  for (let k = 0.05; k <= 1; k += 0.05) {
+    if (!room.contains(...at(k))) continue;
+    const further = at(Math.min(1, k + 0.05));
+    return room.contains(...further) ? further : at(k);
+  }
+  return [c.x, c.z];
+}
 function buildViews() {
   const { center, maxDim, windowWall } = world;
   VIEWS = {
@@ -512,8 +524,9 @@ function buildViews() {
   const eyes = Array.isArray(plan.views) && plan.views.length ? plan.views : autoViews(plan);
   eyes.forEach((v, i) => {
     VIEWS[`eye${i}`] = { label: v.name, eye: true, get: () => {
-      const pos = new THREE.Vector3(v.eye[0], v.eyeHeight ?? 1.6, v.eye[1]);
-      const dir = new THREE.Vector3(v.look[0] - v.eye[0], -0.12, v.look[1] - v.eye[1]).normalize();
+      const [ex, ez] = eyeInside(v.eye);
+      const pos = new THREE.Vector3(ex, v.eyeHeight ?? 1.6, ez);
+      const dir = new THREE.Vector3(v.look[0] - ex, -0.12, v.look[1] - ez).normalize();
       return { pos, target: pos.clone().addScaledVector(dir, 0.1), far: pos.clone().addScaledVector(dir, 3), mode: 'eye' };
     } };
   });
