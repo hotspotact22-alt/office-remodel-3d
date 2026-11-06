@@ -402,8 +402,12 @@ function stopPhoto() {
 }
 controls.addEventListener('start', stopPhoto);
 
+// Past this the image no longer visibly improves (the denoiser is fully off from 400), so the
+// path tracer stops and the finished photo is only redrawn, sparing the GPU and battery.
+let photoSamples = 500;
+const photoDone = () => !!pathTracer && pathTracer.samples >= photoSamples;
 function renderPhotoFrame() {
-  pathTracer.renderSample();
+  if (!photoDone()) pathTracer.renderSample();
   const n = Math.floor(pathTracer.samples);
   if (n < 1) {
     renderer.toneMappingExposure = MODES[lighting].exposure;
@@ -419,7 +423,7 @@ function renderPhotoFrame() {
   mat.sigma = 1 + 4 * k; mat.threshold = 0.012 + 0.09 * k;
   renderer.setRenderTarget(null);
   denoise.render(renderer);
-  setStatus(`Photo render · ${n} samples${n < 60 ? ' — refining…' : n < 250 ? ' — looking good' : ' — final quality'}`);
+  setStatus(`Photo render · ${n} samples${photoDone() ? ' — done' : n < 60 ? ' — refining…' : n < 250 ? ' — looking good' : ' — final quality'}`);
 }
 
 // ── Views / camera moves ────────────────────────────────────────────────────
@@ -990,8 +994,8 @@ const wake = () => { activeUntil = performance.now() + 1500; };
 for (const t of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'resize']) window.addEventListener(t, wake, { capture: true, passive: true });
 controls.addEventListener('change', wake);
 renderer.setAnimationLoop((now) => {
-  if (photo || tween || keys.size || drag3 || buildQueued || now < activeUntil || now - lastFrame > 250) { lastFrame = now; frame(); }
+  if ((photo && !photoDone()) || tween || keys.size || drag3 || buildQueued || now < activeUntil || now - lastFrame > 250) { lastFrame = now; frame(); }
 });
 document.body.classList.add('ready');
 setTimeout(() => $('#loading').remove(), 600);
-window.__office = { scene, camera, controls, renderer, goTo, setLighting, MODES, frame, editor, library, addFromLibrary, thumbFor, setSelected, syncItem, openEditor, closeEditor, get world() { return world; }, get plan() { return plan; }, get pathTracer() { return pathTracer; }, build };
+window.__office = { scene, camera, controls, renderer, goTo, setLighting, MODES, frame, editor, library, addFromLibrary, thumbFor, setSelected, syncItem, openEditor, closeEditor, get world() { return world; }, get plan() { return plan; }, get pathTracer() { return pathTracer; }, get photoSamples() { return photoSamples; }, set photoSamples(n) { photoSamples = n; }, build };
