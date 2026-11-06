@@ -470,12 +470,14 @@ X.glassPartition = (o, { M }) => {
   for (const x of [lx0 + s / 2, lx1 - s / 2]) g.add(box(s, top - bot, 0.04, M.steel, x, (top + bot) / 2, 0));
   g.add(box(lx1 - lx0, s, 0.04, M.steel, cx, top - s / 2, 0));
   g.add(box(lx1 - lx0, s * 2, 0.04, M.steel, cx, bot + s, 0));
-  g.add(box(lx1 - lx0, s * 0.6, 0.03, M.steel, cx, 1.0, 0));
+  // rail and pull at hand height, kept inside a low leaf
+  const hy = Math.min(1.05, (top + bot) / 2), bl = Math.min(0.9, (top - bot) * 0.6);
+  g.add(box(lx1 - lx0, s * 0.6, 0.03, M.steel, cx, hy - 0.05, 0));
   pane(lx1 - lx0 - 2 * s + 0.01, top - bot - 3 * s + 0.01, cx, (top + bot + s) / 2, 0.01);
   for (const z of [-1, 1]) {
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.9, 12), M.brass);
-    bar.position.set(lx0 + 0.09, 1.05, z * 0.055); bar.castShadow = true; g.add(bar);
-    for (const y of [0.65, 1.45]) g.add(box(0.02, 0.02, 0.035, M.brass, lx0 + 0.09, y, z * 0.037));
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, bl, 12), M.brass);
+    bar.position.set(lx0 + 0.09, hy, z * 0.055); bar.castShadow = true; g.add(bar);
+    for (const y of [hy - bl / 2 + 0.05, hy + bl / 2 - 0.05]) g.add(box(0.02, 0.02, 0.035, M.brass, lx0 + 0.09, y, z * 0.037));
   }
   return g;
 };
@@ -705,8 +707,10 @@ export const EXTRA_CATALOG = {
     solids: (o) => { const W = half(o.width ?? 2.0), d = partitionDoor(o); return d ? [[-W, -0.05, d[0], 0.05], [d[1], -0.05, W, 0.05]] : [[-W, -0.05, W, 0.05]]; },
     keywords: ['partition', 'glass partition', 'glass wall', 'divider', 'room divider', 'crittall', 'glass door'],
     defaults: { width: 2.0, panelHeight: 2.2, door: 0 },
-    params: [['width', 'Width (m)', 0.1], ['panelHeight', 'Height (m)', 0.05], ['door', 'Door width (m, 0 = none)', 0.05], ['doorAt', 'Door from left end (m)', 0.05],
-      ['frostFrom', 'Frosted band from (m)', 0.05], ['frostTo', 'Frosted band to (m, 0 = none)', 0.05]],
+    // 4th entry: the value shown when the field is unset (the door is centred by default)
+    params: [['width', 'Width (m)', 0.1], ['panelHeight', 'Height (m)', 0.05], ['door', 'Door width (m, 0 = none)', 0.05],
+      ['doorAt', 'Door from left end (m)', 0.05, (o) => { const d = partitionDoor(o); return d ? Math.round((d[0] + (o.width ?? 2.0) / 2) * 100) / 100 : 0; }],
+      ['frostFrom', 'Frosted band from (m)', 0.05, 0], ['frostTo', 'Frosted band to (m, 0 = none)', 0.05, 0]],
   },
   wallShelf: {
     name: 'Wall shelves', spec: 'Three floating reclaimed-oak shelves (25 cm deep) on slim blackened-steel brackets, books and plant',

@@ -65,13 +65,21 @@ renderer.domElement.setAttribute('aria-label', '3D view of the office: drag to o
 viewport.appendChild(renderer.domElement);
 // The graphics card can reset (a driver timeout, memory pressure, a long Photo render on a weak
 // GPU). Say so instead of leaving a black view, and carry on if the browser restores it.
+let glLost = false;
 renderer.domElement.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();                      // allows the browser to restore the context
+  glLost = true;
   if (photo) stopPhoto();
   pathTracer = null; ptReady = false;      // its GPU buffers are gone; rebuilt on the next Photo
   $('#gpulost').hidden = false;
 });
-renderer.domElement.addEventListener('webglcontextrestored', () => { $('#gpulost').hidden = true; build(); });
+renderer.domElement.addEventListener('webglcontextrestored', () => {
+  glLost = false;
+  pathTracer = null; ptReady = false;
+  if (!hdr) scene.environment = studioEnvironment();   // the old one lived only on the GPU
+  $('#gpulost').hidden = true;
+  build();
+});
 $('#gpulost [data-gl="reload"]').addEventListener('click', () => location.reload());
 
 const labels = new CSS2DRenderer();
@@ -80,7 +88,12 @@ labels.domElement.className = 'label-layer';
 viewport.appendChild(labels.domElement);
 
 const scene = new THREE.Scene();
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+function studioEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer), tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+  return tex;
+}
+scene.environment = studioEnvironment();
 
 const FOV = { orbit: 42, eye: 62 };
 const camera = new THREE.PerspectiveCamera(FOV.orbit, vw() / vh(), 0.03, 200);
@@ -183,6 +196,7 @@ function disposeWorld(w) {
   scene.remove(w.root);
   w.root.traverse((o) => {
     if (o.isMesh && !o.userData.shared) o.geometry.dispose();
+    if (o.isLine) { o.geometry.dispose(); o.material.dispose(); }   // dimension lines: new every build
     if (o.isCSS2DObject) o.element.remove();
   });
 }
@@ -338,15 +352,16 @@ let skyFallback = null;
 function photoEnvironment() {
   if (hdr) return hdr;
   if (!skyFallback) {
-    const w = 64, h = 32, data = new Uint8Array(w * h * 4);
+    const w = 64, h = 32, data = new Float32Array(w * h * 4);
     const top = [214, 226, 240], horizon = [246, 244, 238], ground = [150, 142, 132];
     for (let j = 0; j < h; j++) {   // row 0 is the bottom (v = 0): ground, then horizon, then sky
       const t = 1 - j / (h - 1), c = t < 0.5 ? top.map((v, k) => v + (horizon[k] - v) * (t / 0.5)) : horizon.map((v, k) => v + (ground[k] - v) * ((t - 0.5) / 0.5));
-      for (let i = 0; i < w; i++) data.set([...c.map(Math.round), 255], (j * w + i) * 4);
+      for (let i = 0; i < w; i++) data.set([...c.map((v) => v / 255), 1], (j * w + i) * 4);
     }
-    skyFallback = new THREE.DataTexture(data, w, h);
+    // linear floats like a real HDRI (the path tracer can't decode an sRGB sky)
+    skyFallback = new THREE.DataTexture(data, w, h, THREE.RGBAFormat, THREE.FloatType);
     skyFallback.mapping = THREE.EquirectangularReflectionMapping;
-    skyFallback.colorSpace = THREE.SRGBColorSpace;
+    skyFallback.colorSpace = THREE.LinearSRGBColorSpace;
     skyFallback.needsUpdate = true;
   }
   return skyFallback;
@@ -361,7 +376,7 @@ function usePhotoEnvironment(on) {
 // first Photo render starts in seconds instead of ~30 s.
 async function prewarmPathTracer() {
   await Promise.all([M.ready, loadHDR(lighting)]);
-  if (photo) return;
+  if (photo || glLost) return;
   ensurePathTracer();
   usePhotoEnvironment(true);
   try { pathTracer.setScene(scene, camera); pathTracer.renderSample(); }
@@ -369,7 +384,7 @@ async function prewarmPathTracer() {
 }
 
 async function startPhoto() {
-  if (photo) return;
+  if (photo || glLost) return;   // no Photo while the graphics card is resetting
   if (tween) { tween.start = -Infinity; stepTween(performance.now()); }   // finish any camera move first
   photo = true; ptReady = false;
   document.body.classList.add('photo');

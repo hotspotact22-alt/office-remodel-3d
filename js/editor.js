@@ -360,10 +360,10 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
         h.push(num('item.x', 'x (m)', f.at[0]), num('item.y', 'y (m)', f.at[1]), num('item.facing', 'Facing (°)', facingDeg(f.facing), 15));
         h.push(`<div class="row">${btn('rot-15', '⟲ 15°')}${btn('rot+15', '⟳ 15°')}${btn('rot90', '⟳ 90°')}</div>`);
       }
-      for (const [key, label, step] of PARAMS[f.type] ?? c?.params ?? []) {
+      for (const [key, label, step, unset] of PARAMS[f.type] ?? c?.params ?? []) {
         const [k1, k2] = key.split('.');
         const v = k2 !== undefined ? f[k1]?.[+k2] : f[k1];
-        h.push(num(`item.${key}`, label, v ?? ADDABLE[f.type]?.[k1] ?? 1, step));
+        h.push(num(`item.${key}`, label, v ?? (typeof unset === 'function' ? unset(f) : unset) ?? ADDABLE[f.type]?.[k1] ?? 1, step));
       }
       if (typeof f.text === 'string') h.push(`<label class="f"><span>Text</span><input type="text" data-field="item.text" value="${esc(f.text)}" maxlength="40"></label>`);
       h.push(`<div class="row">${btn('dup', '⧉ Duplicate')}${btn('del', 'Delete', 'danger')}</div><p class="tip">Drag here or in 3D to move · R rotates 90° · Ctrl+D duplicates · Delete removes.</p>`);

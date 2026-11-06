@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Office Remodel — 3D Design</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23c9864f%22/%3E%3Cpath d=%22M8 24V12l8-5 8 5v12h-6v-7h-4v7z%22 fill=%22%231b1b1d%22/%3E%3C/svg%3E">
-  <!-- Release tag (?v=r7, here and on js/main.js below): change it on every release so browsers
+  <!-- Release tag (?v=r8, here and on js/main.js below): change it on every release so browsers
        that keep old copies of the scripts (phones do) load the new ones after a single reload. -->
   <script type="importmap">
     {
@@ -15,20 +15,20 @@
         "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
         "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
         "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.28/build/index.module.js",
-        "./plan.js": "./plan.js?v=r7",
-        "./js/catalog.js": "./js/catalog.js?v=r7",
-        "./js/editor.js": "./js/editor.js?v=r7",
-        "./js/extras.js": "./js/extras.js?v=r7",
-        "./js/furniture.js": "./js/furniture.js?v=r7",
-        "./js/grid.js": "./js/grid.js?v=r7",
-        "./js/layout.js": "./js/layout.js?v=r7",
-        "./js/library.js": "./js/library.js?v=r7",
-        "./js/materials.js": "./js/materials.js?v=r7",
-        "./js/models.js": "./js/models.js?v=r7",
-        "./js/notes.js": "./js/notes.js?v=r7",
-        "./js/planmath.js": "./js/planmath.js?v=r7",
-        "./js/room.js": "./js/room.js?v=r7",
-        "./js/rules.js": "./js/rules.js?v=r7"
+        "./plan.js": "./plan.js?v=r8",
+        "./js/catalog.js": "./js/catalog.js?v=r8",
+        "./js/editor.js": "./js/editor.js?v=r8",
+        "./js/extras.js": "./js/extras.js?v=r8",
+        "./js/furniture.js": "./js/furniture.js?v=r8",
+        "./js/grid.js": "./js/grid.js?v=r8",
+        "./js/layout.js": "./js/layout.js?v=r8",
+        "./js/library.js": "./js/library.js?v=r8",
+        "./js/materials.js": "./js/materials.js?v=r8",
+        "./js/models.js": "./js/models.js?v=r8",
+        "./js/notes.js": "./js/notes.js?v=r8",
+        "./js/planmath.js": "./js/planmath.js?v=r8",
+        "./js/room.js": "./js/room.js?v=r8",
+        "./js/rules.js": "./js/rules.js?v=r8"
       }
     }
   </script>
@@ -198,7 +198,9 @@
     #newroom, #gpulost { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 7; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; font-size: 13px; max-width: min(560px, calc(100vw - 24px)); }
     #newroom[hidden], #gpulost[hidden] { display: none; }
     #newroom .primary, #gpulost .primary { background: var(--accent); color: #1b1b1d; font-weight: 600; }
-    @media (max-width: 720px) { #newroom, #gpulost { top: auto; bottom: 120px; } }
+    body.split #newroom, body.split #gpulost { left: 75%; max-width: calc(50vw - 24px); }   /* over the 3D half */
+    @media (max-width: 900px) { body.split #newroom, body.split #gpulost { left: 50%; top: calc(50% + 12px); max-width: calc(100vw - 24px); } }
+    @media (max-width: 640px) { #newroom, #gpulost { top: 10px; } }   /* above the brand card, clear of the selection bar */
     body.noting #viewport canvas { cursor: crosshair; }
     #note-pop { position: fixed; z-index: 40; width: 330px; padding: 12px 14px; }
     #note-pop[hidden] { display: none; }
@@ -355,6 +357,7 @@
     // Capture phase also catches a script or module that fails to download (those errors don't bubble).
     window.addEventListener('error', function (e) {
       if (document.body.classList.contains('ready')) return;
+      if (e.target && e.target.tagName === 'SCRIPT' && e.target.type === 'module') return;   // its onerror explains it
       var src = e.target && e.target !== window && (e.target.src || e.target.href);
       showError(src ? 'A file failed to load: ' + src : (e.message || 'Script error'));
     }, true);
@@ -362,7 +365,7 @@
       if (!document.body.classList.contains('ready')) showError('Still not ready after 30 seconds. Check the internet connection, then reload the page.');
     }, 30000);
   </script>
-  <script type="module" src="js/main.js?v=r7"
+  <script type="module" src="js/main.js?v=r8"
     onerror="showError('Needs an internet connection (loads three.js from a CDN) and must be opened through a local server, not as a file.')"></script>
 </body>
 </html>

@@ -178,7 +178,7 @@ function ceilingTileTexture() {
 function carpetTexture() {
   const S = 512, rand = rng(17);
   const [c, ctx] = canvas(S);
-  ctx.fillStyle = '#4b4d51'; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = '#4e4b48'; ctx.fillRect(0, 0, S, S);   // neutral charcoal (daylight reads cool)
   speckle(ctx, S, 26000, rand, 0.22, false);
   speckle(ctx, S, 16000, rand, 0.12, true);
   return toTexture(c, 0.5);

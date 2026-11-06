@@ -218,7 +218,7 @@ function furnishOnce(plan, opt = {}) {
     const target = f ? walls.slice().sort((a, b) => dot(a.n, f) - dot(b.n, f)) : walls.slice().sort((a, b) => b.len - a.len);
     let groups = windows.length ? 1 : 2;   // no windows → no curtains soaking up sound, so a second set of panels
     for (const w of target) {
-      if (['brick', 'glass'].includes(plan.finishes?.[w.i])) continue;   // never cover a brick feature wall or glass
+      if (['brick', 'glass'].includes(plan.finishes?.[w.i] ?? plan.finishes?.default)) continue;   // never cover a brick feature wall or glass
       // longest solid run on this wall
       let bestRun = null;
       for (let t0 = 0.2; t0 < w.len - 1.3; t0 += 0.1) {
