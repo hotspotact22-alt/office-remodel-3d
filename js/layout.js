@@ -149,6 +149,7 @@ function furnishOnce(plan, opt = {}) {
     const cands = [];
     SIZES.forEach(([L1, L2, kind], si) => {
       for (const cn of corners) {
+        if (Math.abs(dot(cn.e1, cn.e2)) > 0.1) continue;   // the lounge layout needs a square corner (a 45° one would skew it through the wall)
         for (const [ex, ey, wX, wY] of [[cn.e1, cn.e2, cn.wA, cn.wB], [cn.e2, cn.e1, cn.wB, cn.wA]]) {
           const rect = rectFrom(cn.c, ex, ey, [0.06, 0.06, L1, L2]);
           if (!grid.fits(rect)) continue;

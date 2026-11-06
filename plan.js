@@ -9,10 +9,10 @@
 // MEASURED on site (Nov 2026, phone Measure app), drawn in sketches/outline-v2.png:
 //   A 13′7″  B 5′10″  C 3′8″  D 15′7″  E 4′5″  F 5′9″  G 3′  J 35″  K 7′7″  S 9′ (removed),
 //   office depth S→F 17′9″, ceiling 7′10″, office door 32½″ × 6′4″.
-// WORKED OUT, not measured: I ≈ 35″ (“similar to J”); H ≈ 14′2″ (you measured 11′2″, which
-// doesn’t fit the 17′9″ depth); the angles of the short walls, assuming the left walls K and H
-// line up and the other walls meet square as sketched. Window sills and heights, and the
-// lunch-room door width, are assumed.
+// WORKED OUT, not measured: I ≈ 35″ (“similar to J”); the window walls I and J sit at 45°, like G
+// (you saw this on site), which makes H ≈ 12′8″ (you measured 11′2″, which doesn’t fit the
+// 17′9″ depth); the other angles assume the left walls K and H line up and the remaining walls
+// meet square as sketched. Window sills and heights, and the lunch-room door width, are assumed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default {
@@ -33,8 +33,8 @@ export default {
     [2.36, 8.13],   // F — exposed brick
     [0.61, 8.13],   // G — angled window
     [0, 7.44],      // H — office left wall
-    [0, 3.12],      // I — angled window (office)
-    [0.79, 2.72],   // J — angled window (lunch room); where S used to meet the outer wall
+    [0, 3.57],      // I — angled window (office), 45°
+    [0.63, 2.94],   // J — angled window (lunch room), 45°; where S used to meet the outer wall
     [0, 2.31],      // K — lunch room left wall
   ],
 
