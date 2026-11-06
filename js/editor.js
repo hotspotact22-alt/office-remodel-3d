@@ -580,23 +580,12 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
     render();
   }
 
-  svg.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 && e.button !== 1) return;
-    if (e.pointerType === 'touch') {
-      touches.set(e.pointerId, [e.clientX, e.clientY]);
-      if (touches.size === 2) { svg.setPointerCapture(e.pointerId); startPinch(); return; }
-      if (touches.size > 2) return;
-    }
-    const p = toPlan(e);
-    let el = e.target.closest('[data-kind]');
-    // a hanging light's bulb dot must not block the table or desk underneath it
-    if (el?.dataset.kind === 'item' && HANGING.has(plan().furniture[+el.dataset.i]?.type)) {
-      const under = document.elementsFromPoint(e.clientX, e.clientY).map((n) => n.closest?.('[data-kind="item"]'))
-        .find((n) => n && !HANGING.has(plan().furniture[+n.dataset.i]?.type));
-      if (under) el = under;
-    }
-    const kind = el?.dataset.kind, i = el ? +el.dataset.i : -1;
-    svg.setPointerCapture(e.pointerId);
+  // A typed value counts once the field loses focus; make that happen before the selection changes
+  // (a tap on the plan would otherwise rebuild the inspector and drop it).
+  const commitField = () => { const a = document.activeElement; if (a && insp.contains(a) && a.matches('input, select')) a.blur(); };
+
+  // what a click (or a finger lift) does in Note, Draw room and Set scale
+  function modeAction(e, p, kind, i) {
     if (mode === 'note') {
       const pl = plan();
       let target = null;
@@ -633,7 +622,32 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
         mode = null; calPts = [];
         renderInspector();
       }
-      render(); return;
+      render();
+    }
+  }
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 && e.button !== 1) return;
+    commitField();
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (touches.size === 2) { svg.setPointerCapture(e.pointerId); startPinch(); return; }
+      if (touches.size > 2) return;
+    }
+    const p = toPlan(e);
+    let el = e.target.closest('[data-kind]');
+    // a hanging light's bulb dot must not block the table or desk underneath it
+    if (el?.dataset.kind === 'item' && HANGING.has(plan().furniture[+el.dataset.i]?.type)) {
+      const under = document.elementsFromPoint(e.clientX, e.clientY).map((n) => n.closest?.('[data-kind="item"]'))
+        .find((n) => n && !HANGING.has(plan().furniture[+n.dataset.i]?.type));
+      if (under) el = under;
+    }
+    const kind = el?.dataset.kind, i = el ? +el.dataset.i : -1;
+    svg.setPointerCapture(e.pointerId);
+    if (mode === 'note' || mode === 'draw' || mode === 'calibrate') {
+      // a finger acts on lift-off, so the first finger of a pinch or a pan never adds a corner
+      if (e.pointerType !== 'mouse') drag = { kind: 'pan', s0: [e.clientX, e.clientY], vb0: { ...vb }, tol: 10, moved: false, modeTap: { p, kind, i } };
+      else modeAction(e, p, kind, i);
+      return;
     }
     if (kind === 'underlay' && mode === 'moveImage') { drag = { kind: 'underlay', p0: p, o0: [underlay.x, underlay.y] }; return; }
     const s0 = [e.clientX, e.clientY], tol = e.pointerType === 'mouse' ? 3 : 10;
@@ -656,7 +670,7 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
     if (touches.has(e.pointerId)) touches.set(e.pointerId, [e.clientX, e.clientY]);
     if (drag?.kind === 'pinch') { if (touches.size === 2) movePinch(); return; }
     const p = toPlan(e);
-    if (mode === 'draw' || mode === 'calibrate') {
+    if ((mode === 'draw' || mode === 'calibrate') && !drag?.modeTap) {   // a finger pans instead
       cursor = mode === 'draw' ? [snap(p[0]), snap(p[1])] : p;
       if (mode === 'draw' && drawPts.length) {
         const last = drawPts[drawPts.length - 1], dx = Math.abs(cursor[0] - last[0]), dy = Math.abs(cursor[1] - last[1]);
@@ -722,7 +736,11 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
     if (drag?.kind === 'pinch') { if (touches.size < 2) drag = null; return; }
     if (!drag) return;
     const d = drag; drag = null;
-    if (d.kind === 'pan') { if (!d.moved && e.type === 'pointerup') { sel = d.tap ?? null; render(); renderInspector(); } return; }
+    if (d.kind === 'pan') {
+      if (d.moved || e.type !== 'pointerup') return;
+      if (d.modeTap) { if (mode === 'note' || mode === 'draw' || mode === 'calibrate') modeAction(e, d.modeTap.p, d.modeTap.kind, d.modeTap.i); return; }
+      sel = d.tap ?? null; render(); renderInspector(); return;
+    }
     if (d.kind === 'underlay') { saveUnderlay(); return; }
     if (d.moved) changed();
   };
@@ -844,7 +862,7 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
     get isOpen() { return isOpen; },
     get dragging() { return !!drag && drag.kind !== 'pan'; },
     // used by the 3D view so both views share one selection and one undo history
-    select(s) { sel = s; lastSelKey = s ? `${s.kind}:${s.i}` : ''; if (isOpen) { render(); renderInspector(); } },
+    select(s) { commitField(); sel = s; lastSelKey = s ? `${s.kind}:${s.i}` : ''; if (isOpen) { render(); renderInspector(); } },
     get selection() { return sel; },
     refresh({ inspector = true } = {}) { if (!isOpen) return; render(); if (inspector) renderInspector(); },
     checkpoint,

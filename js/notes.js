@@ -21,9 +21,14 @@ function length(text) {
 const has = (text, re) => re.test(text.toLowerCase());
 const P = (p) => [round2(p[0]), round2(p[1])];
 
+// Quoted sign wording: "…", “…”, or '…' / ‘…’ that starts a word, so the apostrophe in
+// "let's" or "Joe's" (straight or curly) is never taken for a quote.
+const QUOTED = /"([^"]+)"|“([^”]+)”|(?<![\p{L}\p{N}])['‘]([^'’]+)['’](?![\p{L}\p{N}])/gu;
+const quoted = (text) => { const m = [...text.matchAll(QUOTED)][0]; return m ? m[1] ?? m[2] ?? m[3] : null; };
+
 // Best catalog type for the words in a note (house-style pieces win ties over scanned ones).
 export function matchAsset(text, preferLayers = null) {
-  const plain = text.replace(/["“”'‘’][^"“”'‘’]*["“”'‘’]/g, ' ');            // quoted text is sign wording, not a noun
+  const plain = text.replace(QUOTED, ' ');            // quoted text is sign wording, not a noun
   const ws = words(plain);
   const w = new Set(ws.flatMap(forms));
   const head = ws.length ? forms(ws[ws.length - 1]) : [];   // "leather sofa" → sofa
@@ -105,7 +110,9 @@ export function applyNote(plan, note) {
         const hit = list.sort((a, b) => Math.abs(a.o.offset + a.o.width / 2 - t) - Math.abs(b.o.offset + b.o.width / 2 - t))[0];
         if (hit) { plan.openings.splice(hit.i, 1); return done(`Removed the ${kind} on wall ${tg.wall + 1}.`); }
       }
-      const items = plan.furniture.map((f, i) => ({ f, i })).filter(({ f }) => f.at && CATALOG[f.type]?.layer === 'wall' && dist(f.at, add(w.a, mul(w.u, t))) < 1);
+      const at = add(w.a, mul(w.u, t));
+      const items = plan.furniture.map((f, i) => ({ f, i })).filter(({ f }) => f.at && CATALOG[f.type]?.layer === 'wall' && dist(f.at, at) < 1)
+        .sort((a, b) => dist(a.f.at, at) - dist(b.f.at, at));   // the piece nearest the pin
       if (items.length) { const { f, i } = items[0]; plan.furniture.splice(i, 1); return done(`Removed ${label(f.type)}.`); }
       return { done: false, result: '' };
     }
@@ -125,8 +132,8 @@ export function applyNote(plan, note) {
     const type = rest.trim() ? matchAsset(finWords.length ? rest : text, ['wall']) : null;
     if (type) {
       const extra = {};
-      const q = text.match(/["“']([^"”']+)["”']/);
-      if (q && 'text' in (ADDABLE[type] ?? {})) extra.text = q[1];
+      const q = quoted(text);
+      if (q && 'text' in (ADDABLE[type] ?? {})) extra.text = q;
       const item = placeOnWall(plan, newItem(plan, type, extra), w, t, CATALOG[type].layer === 'wall' ? tg.h : null);
       return done(`Added ${label(item.type)} on wall ${tg.wall + 1}.`);
     }

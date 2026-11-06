@@ -37,7 +37,10 @@ try {
 const ready = (p, dedupe = true) => { normalizePlan(p, { dedupe }); if (p.furniture === 'auto') autoFurnish(p); return p; };
 const samplePlanCopy = () => ready(structuredClone(samplePlan));
 function loadPlan() {
-  try { const s = localStorage.getItem(STORE); if (s) return ready(JSON.parse(s)); } catch { /* fall through */ }
+  let s = null;
+  try { s = localStorage.getItem(STORE); if (s) return ready(JSON.parse(s)); } catch {
+    if (s) try { localStorage.setItem(`${STORE}-broken`, s); } catch { /* storage full: skip the backup */ }   // keep the unreadable save
+  }
   return samplePlanCopy();
 }
 function savePlan(p) { try { localStorage.setItem(STORE, JSON.stringify(p)); } catch (e) { console.warn('Could not save plan', e); } }
@@ -211,17 +214,24 @@ function build() {
   } catch (e) {
     console.error('This plan could not be built:', e);
     try { localStorage.setItem(`${STORE}-broken`, JSON.stringify(plan)); } catch { /* full storage: skip the backup */ }
-    plan = lastGood ? JSON.parse(lastGood) : samplePlanCopy();
-    savePlan(plan);
+    const startup = !lastGood;
+    plan = startup ? samplePlanCopy() : JSON.parse(lastGood);
+    if (!startup) savePlan(plan);   // at startup the saved plan stays as it is until the next edit
     buildWorld();
     lastGood = JSON.stringify(plan);
-    setTimeout(() => toast('That plan couldn’t be built, so the last working version was restored.'), 0);
+    editor?.refresh();
+    setTimeout(() => toast(startup ? 'Your saved plan couldn’t be built, so the starting room is shown. A backup copy of your plan was kept.'
+      : 'That plan couldn’t be built, so the last working version was restored.'), 0);
   }
 }
 function buildWorld() {
   stopPhoto();
   if (world) disposeWorld(world);
-  ready(plan, !editor?.dragging);   // never renumber corners under a drag in progress
+  // Mid-drag, walls change length every frame: fit doors and windows to them for this build
+  // only, so a wall that is briefly shorter than its window doesn't shrink or drop it for good.
+  const dragging = !!editor?.dragging;
+  const keepOpenings = dragging ? plan.openings.map((o) => [o, o.width, o.offset]) : null;
+  ready(plan, !dragging);   // never renumber corners under a drag in progress
   const root = new THREE.Group();
   const room = buildRoom(plan, M);
   root.add(room.group);
@@ -272,6 +282,7 @@ function buildWorld() {
   scene.environmentRotation.y = scene.backgroundRotation.y = Math.atan2(-windowWall.outward.z, windowWall.outward.x);
 
   if (LOW) for (const l of ctx.lamps) l.light.castShadow = false;   // each lamp shadow is 6 extra renders per frame
+  if (keepOpenings) plan.openings = keepOpenings.map(([o, w, off]) => Object.assign(o, { width: w, offset: off }));
   world = { root, room, items, lamps: ctx.lamps, center, maxDim, windowWall, daylit: windowWall.windowArea > 0.5 };
   ceilingShown = null;
   applyLampLevels();
@@ -390,7 +401,7 @@ async function startPhoto() {
   document.body.classList.add('photo');
   $('#btn-photo').classList.add('active');
   setStatus('Loading materials…');
-  await Promise.all([M.ready, loadHDR(lighting), modelsReady()]);
+  await Promise.all([M.ready, loadHDR(lighting), Promise.race([modelsReady(), new Promise((r) => setTimeout(r, 20000))])]);
   if (!photo) return;
   if (selBox) selBox.visible = false;
   controls.update();
@@ -793,6 +804,7 @@ function showNotePopover(target, x, y) {
   pop.style.top = `${Math.max(8, Math.min(window.innerHeight - h - 8, y + 12))}px`;
   input.focus();
 }
+document.addEventListener('mousedown', (e) => { if (!$('#note-pop').hidden && e.target.closest?.('#viewport, svg')) e.preventDefault(); }, true);
 function hideNotePopover() { $('#note-pop').hidden = true; noteTarget = null; }
 function addNote(text) {
   if (!noteTarget || !text.trim()) return hideNotePopover();
@@ -860,6 +872,14 @@ const TAP_PX = (e) => (e.pointerType === 'mouse' ? 4 : 10);
 const TAP_MS = 500;   // a longer press is a held finger starting to orbit, not a tap
 const fingers = new Set();
 let drag3 = null, click3 = null;
+function noteTargetAt(e) {
+  const hit = firstHit(e);
+  if (!hit) return null;
+  const P2 = [round2(hit.point.x), round2(hit.point.z)], idx = itemOf(hit.object), wi = wallOf(hit.object);
+  if (idx >= 0) return { kind: 'item', i: idx, at: plan.furniture[idx].at ?? P2, hit: P2, h: round2(hit.point.y) };
+  if (wi >= 0) { const w = getWalls(plan)[wi]; return { kind: 'wall', wall: wi, t: round2(dot(sub(P2, w.a), w.u)), h: round2(hit.point.y) }; }
+  return { kind: hit.object.userData.surface === 'ceiling' ? 'ceiling' : 'floor', at: P2 };
+}
 viewport.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || !world || drag3) return;   // a second pointer while dragging is ignored
   if (e.target.closest?.('.pin3')) return;           // tapping a note pin just opens it
@@ -869,15 +889,12 @@ viewport.addEventListener('pointerdown', (e) => {
     fingers.add(e.pointerId);
     if (fingers.size > 1) { click3 = null; return; }   // a pinch, not a tap
   }
-  const hit = firstHit(e);
   if (noteMode) {
-    if (!hit) return;
+    // a finger pins on lift-off, so the first finger of a pinch or an orbit never opens the box
+    if (touch) { click3 = { x: e.clientX, y: e.clientY, idx: -1, touch, id: e.pointerId, t: performance.now(), tol: TAP_PX(e) }; return; }
+    const target = noteTargetAt(e);
+    if (!target) return;
     e.stopPropagation(); controls.enabled = false;
-    const P2 = [round2(hit.point.x), round2(hit.point.z)], idx = itemOf(hit.object), wi = wallOf(hit.object);
-    let target;
-    if (idx >= 0) target = { kind: 'item', i: idx, at: plan.furniture[idx].at ?? P2, hit: P2, h: round2(hit.point.y) };
-    else if (wi >= 0) { const w = getWalls(plan)[wi]; target = { kind: 'wall', wall: wi, t: round2(dot(sub(P2, w.a), w.u)), h: round2(hit.point.y) }; }
-    else target = { kind: hit.object.userData.surface === 'ceiling' ? 'ceiling' : 'floor', at: P2 };
     setTimeout(() => { controls.enabled = true; }, 0);
     showNotePopover(target, e.clientX, e.clientY);
     return;
@@ -933,7 +950,8 @@ const endDrag3 = (e) => {
   const c = click3;
   if (!c || e.pointerId !== c.id) return;
   click3 = null;
-  if (e.type !== 'pointerup' || noteMode || Math.hypot(e.clientX - c.x, e.clientY - c.y) >= c.tol) return;
+  if (e.type !== 'pointerup' || Math.hypot(e.clientX - c.x, e.clientY - c.y) >= c.tol) return;
+  if (noteMode) { const t = noteTargetAt(e); if (t) showNotePopover(t, e.clientX, e.clientY); return; }
   if (c.touch) {
     if (performance.now() - c.t > TAP_MS) return;
     const sel = plan.furniture[selected];

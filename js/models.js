@@ -132,12 +132,13 @@ function template(id) {
     });
     cache.set(id, p);
     pending.add(p);
-    p.finally(() => pending.delete(p)).catch(() => {});
+    p.finally(() => pending.delete(p)).catch(() => { if (cache.get(id) === p) cache.delete(id); });   // a failed download is tried again on the next build
   }
   return cache.get(id);
 }
 
 const placeholderMat = new THREE.MeshStandardMaterial({ color: '#b9b2a7', roughness: 1, transparent: true, opacity: 0.35, depthWrite: false });
+const failedMat = placeholderMat.clone(); failedMat.color.set('#c96f3b');   // shown where a model couldn't download
 
 export const MODEL_CATALOG = {};
 export const MODEL_BUILDERS = {};
@@ -183,7 +184,7 @@ for (const [id, [name, cat, layer, [w, d, h], keywords]] of Object.entries(TABLE
         else light.position.y = lift + sz.y * 0.8;
       }
       onLoaded(wrap);
-    }).catch((e) => { console.warn(`Model ${id} failed to load`, e); ph.material = ph.material.clone(); ph.material.color.set('#c96f3b'); });
+    }).catch((e) => { console.warn(`Model ${id} failed to load`, e); ph.material = failedMat; });
     if (layer === 'wall') wrap.userData.wallMounted = true;
     return wrap;
   };
