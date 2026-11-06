@@ -159,6 +159,31 @@ function artTexture() {
   return t;
 }
 
+// Suspended acoustic ceiling: 2′ × 2′ (61 cm) mineral-fibre tiles in a white grid.
+function ceilingTileTexture() {
+  const S = 512, rand = rng(11), T = 0.6096;
+  const [c, ctx] = canvas(S);
+  ctx.fillStyle = '#eeece7'; ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 2600; i++) {                     // fissured mineral-fibre pinholes
+    ctx.fillStyle = `rgba(120,116,110,${0.08 + rand() * 0.18})`;
+    const w = 1 + rand() * 3;
+    ctx.fillRect(rand() * S, rand() * S, w, 1 + rand() * 1.5);
+  }
+  ctx.fillStyle = '#f7f6f3'; ctx.fillRect(0, 0, S, 7); ctx.fillRect(0, 0, 7, S);   // grid tee
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(0, 7, S, 2); ctx.fillRect(7, 0, 2, S);   // shadow line
+  return toTexture(c, T);
+}
+
+// Commercial loop-pile carpet tile, charcoal with a fine heather.
+function carpetTexture() {
+  const S = 512, rand = rng(17);
+  const [c, ctx] = canvas(S);
+  ctx.fillStyle = '#4b4d51'; ctx.fillRect(0, 0, S, S);
+  speckle(ctx, S, 26000, rand, 0.22, false);
+  speckle(ctx, S, 16000, rand, 0.12, true);
+  return toTexture(c, 0.5);
+}
+
 export function createMaterials() {
   const brick = brickTextures();
   const M = {
@@ -168,6 +193,8 @@ export function createMaterials() {
     wallCut: new THREE.MeshStandardMaterial({ color: '#2a2928', roughness: 1 }),
     wallOutside: new THREE.MeshStandardMaterial({ color: '#cfcac2', roughness: 1 }),
     ceiling: new THREE.MeshStandardMaterial({ color: '#2b2b2d', roughness: 0.95, side: THREE.DoubleSide }),
+    ceilingTiles: new THREE.MeshStandardMaterial({ map: ceilingTileTexture(), roughness: 0.97, side: THREE.DoubleSide }),
+    carpet: new THREE.MeshStandardMaterial({ map: carpetTexture(), roughness: 1 }),
     slab: new THREE.MeshStandardMaterial({ color: '#3b3a38', roughness: 1 }),
     concrete: new THREE.MeshStandardMaterial({ map: concreteTexture(), roughness: 0.38, metalness: 0.05 }),
     wood: new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.7 }),

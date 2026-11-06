@@ -147,7 +147,7 @@ export function buildRoom(plan, M) {
   const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, -y)));
   const floorGeo = new THREE.ShapeGeometry(shape);
   floorGeo.rotateX(-Math.PI / 2);
-  const floor = new THREE.Mesh(floorGeo, M.concrete);
+  const floor = new THREE.Mesh(floorGeo, plan.floorFinish === 'carpet' ? M.carpet : M.concrete);
   floor.receiveShadow = true;
   floor.userData.surface = 'floor';
   group.add(floor);
@@ -160,7 +160,7 @@ export function buildRoom(plan, M) {
   // Ceiling (hidden from view in dollhouse mode but still blocks sunlight)
   const ceilGeo = new THREE.ShapeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))));
   ceilGeo.rotateX(Math.PI / 2);
-  const ceiling = new THREE.Mesh(ceilGeo, M.ceiling);
+  const ceiling = new THREE.Mesh(ceilGeo, plan.ceilingFinish === 'tiles' ? M.ceilingTiles : M.ceiling);
   ceiling.position.y = H;
   ceiling.castShadow = true;
   ceiling.userData.surface = 'ceiling';

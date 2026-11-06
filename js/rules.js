@@ -49,11 +49,12 @@ export const SOURCES = [
 ];
 
 // Approximate absorption coefficients at 500–1000 Hz, and sabins (m²) per object.
-const ALPHA = { brick: 0.04, plaster: 0.06, charcoal: 0.06, floor: 0.02, ceiling: 0.03, glass: 0.04 };
+// Mid-frequency absorption. Typical published values: mineral-fibre ceiling tile ≈ NRC 0.55, loop-pile carpet on concrete ≈ 0.25.
+const ALPHA = { brick: 0.04, plaster: 0.06, charcoal: 0.06, floor: 0.02, ceiling: 0.03, glass: 0.04, ceilingTiles: 0.55, carpet: 0.25 };
 const SABINS = { clubChair: 0.4, ottoman: 0.15, workstation: 0.35, meetingTable: 0.9, pipeShelf: 0.6, plant: 0.1 };
 export function estimateRT60(plan, walls = getWalls(plan)) {
   const H = plan.ceilingHeight, area = Math.abs(plan.outline.reduce((s, p, i, a) => s + p[0] * a[(i + 1) % a.length][1] - a[(i + 1) % a.length][0] * p[1], 0)) / 2;
-  let A = area * (ALPHA.floor + ALPHA.ceiling);
+  let A = area * ((plan.floorFinish === 'carpet' ? ALPHA.carpet : ALPHA.floor) + (plan.ceilingFinish === 'tiles' ? ALPHA.ceilingTiles : ALPHA.ceiling));
   for (const w of walls) {
     const glass = plan.openings.filter((o) => o.wall === w.i).reduce((s, o) => s + o.width * o.height, 0);
     const fin = plan.finishes?.[w.i] ?? plan.finishes?.default ?? 'plaster';

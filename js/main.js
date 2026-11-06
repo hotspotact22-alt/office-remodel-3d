@@ -48,6 +48,12 @@ const viewport = $('#viewport');
 const vw = () => viewport.clientWidth || window.innerWidth, vh = () => viewport.clientHeight || window.innerHeight;
 // Phones and tablets: render fewer pixels, smaller shadows and a lighter sky so they stay smooth.
 const LOW = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+// No 3D graphics (hardware acceleration off, or the browser blocked WebGL after a graphics-card
+// reset): say so plainly instead of a generic load error.
+if (!document.createElement('canvas').getContext('webgl2')) {
+  window.showError?.('This browser could not start 3D graphics (WebGL). Turn on hardware acceleration in the browser settings, or restart the browser, then reload this page.');
+  throw new Error('WebGL 2 is not available');
+}
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, LOW ? 1.5 : 2));
 renderer.setSize(vw(), vh());
@@ -57,6 +63,16 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.domElement.setAttribute('role', 'img');
 renderer.domElement.setAttribute('aria-label', '3D view of the office: drag to orbit, click furniture to select and move it');
 viewport.appendChild(renderer.domElement);
+// The graphics card can reset (a driver timeout, memory pressure, a long Photo render on a weak
+// GPU). Say so instead of leaving a black view, and carry on if the browser restores it.
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();                      // allows the browser to restore the context
+  if (photo) stopPhoto();
+  pathTracer = null; ptReady = false;      // its GPU buffers are gone; rebuilt on the next Photo
+  $('#gpulost').hidden = false;
+});
+renderer.domElement.addEventListener('webglcontextrestored', () => { $('#gpulost').hidden = true; build(); });
+$('#gpulost [data-gl="reload"]').addEventListener('click', () => location.reload());
 
 const labels = new CSS2DRenderer();
 labels.setSize(vw(), vh());
