@@ -179,6 +179,10 @@
     @media (max-width: 520px) { #selbar .lbl { display: none; } #sel-name { max-width: 130px; } }
     #toast { position: fixed; bottom: 166px; left: 50%; transform: translateX(-50%); padding: 9px 14px; font-size: 13px; z-index: 6; max-width: min(520px, 90vw); text-align: center; }
     #toast[hidden] { display: none; }
+    #newroom { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 7; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; font-size: 13px; max-width: min(560px, calc(100vw - 24px)); }
+    #newroom[hidden] { display: none; }
+    #newroom .primary { background: var(--accent); color: #1b1b1d; font-weight: 600; }
+    @media (max-width: 720px) { #newroom { top: auto; bottom: 120px; } }
     body.noting #viewport canvas { cursor: crosshair; }
     #note-pop { position: fixed; z-index: 40; width: 330px; padding: 12px 14px; }
     #note-pop[hidden] { display: none; }
@@ -308,6 +312,11 @@
     <button data-sa="none" aria-label="Deselect">✕</button>
   </div>
   <div id="toast" class="card" role="status" aria-live="polite" hidden></div>
+  <div id="newroom" class="card" role="status" hidden>
+    <span>Your room was updated with new measurements.</span>
+    <button type="button" class="primary" data-nr="use">Show the updated room</button>
+    <button type="button" data-nr="keep">Keep my layout</button>
+  </div>
   <form id="note-pop" class="card" role="dialog" aria-label="Pin a note" hidden>
     <div class="np-where"></div>
     <input placeholder="What should go here? e.g. glass wall, painting, sofa" autocomplete="off" aria-label="Note">
@@ -331,7 +340,7 @@
       if (!document.body.classList.contains('ready')) showError('Still not ready after 30 seconds. Check the internet connection, then reload the page.');
     }, 30000);
   </script>
-  <script type="module" src="js/main.js?v=touch3"
+  <script type="module" src="js/main.js?v=room4"
     onerror="showError('Needs an internet connection (loads three.js from a CDN) and must be opened through a local server, not as a file.')"></script>
 </body>
 </html>

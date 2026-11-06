@@ -916,10 +916,27 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape') setSelected(-1);
 });
 
+// A plan saved in this browser from an older starting plan (plan.js has changed since, e.g. new
+// measurements): offer the new room once. Undo brings the old layout back.
+function offerUpdatedRoom() {
+  if (!samplePlan.version || plan.version === samplePlan.version) return;
+  const bar = $('#newroom');
+  bar.hidden = false;
+  bar.onclick = (e) => {
+    const a = e.target.closest('[data-nr]')?.dataset.nr;
+    if (!a) return;
+    bar.hidden = true;
+    if (a === 'keep') { plan.version = samplePlan.version; savePlan(plan); return; }
+    editor.checkpoint(); plan = samplePlanCopy(); savePlan(plan); setSelected(-1); build(); editor.refresh();
+    toast('Showing the updated room. Undo (↶) brings your old layout back.');
+  };
+}
+
 wireUI();
 build();
 setLighting('day');
 goTo('overview', true);
+offerUpdatedRoom();
 setTimeout(() => (window.requestIdleCallback ?? setTimeout)(() => prewarmPathTracer()), 5000);
 
 const timer = new THREE.Timer();

@@ -18,6 +18,8 @@
 export default {
   name: 'Suite 7 Office — Industrial Loft',
   placeholder: false,
+  // Change this whenever this file changes: browsers that saved an older version are offered the new room.
+  version: '2026-11-06-45deg',
 
   ceilingHeight: 2.39,     // 7′10″
   wallThickness: 0.12,
