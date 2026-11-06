@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Office Remodel — 3D Design</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23c9864f%22/%3E%3Cpath d=%22M8 24V12l8-5 8 5v12h-6v-7h-4v7z%22 fill=%22%231b1b1d%22/%3E%3C/svg%3E">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
+        "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
+        "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
+        "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.28/build/index.module.js"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --glass: rgba(24, 24, 26, 0.78);
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #f2efe9;
+      --muted: #a9a49b;
+      --accent: #c9864f;
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #e6e2db; color: var(--text); }
+    /* touch screens: no text selection or long-press menus while dragging in the views */
+    #viewport, #editor svg, .toolbar, #selbar, .lib-card { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #viewport { position: fixed; inset: 0; }
+    #viewport canvas { position: absolute; inset: 0; display: block; }
+    .label-layer { position: absolute !important; inset: 0; pointer-events: none; }
+    .dim-label {
+      font: 600 11px/1 "Inter", "Segoe UI", sans-serif; color: #f2efe9; background: #2a2928;
+      padding: 4px 7px; border-radius: 4px; white-space: nowrap; letter-spacing: 0.02em;
+    }
+
+    .card {
+      background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    .brand { position: fixed; top: 18px; left: 18px; padding: 16px 20px; max-width: min(380px, calc(100vw - 36px)); }
+    .eyebrow { font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+    .brand h1 { margin: 4px 0 6px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+    .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+    .badge {
+      display: inline-block; margin-top: 10px; font-size: 11.5px; color: #f6d9b8;
+      background: rgba(201, 134, 79, 0.18); border: 1px solid rgba(201, 134, 79, 0.4);
+      padding: 4px 9px; border-radius: 999px;
+    }
+    .badge[hidden] { display: none; }
+
+    .toolbar {
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; padding: 7px; max-width: calc(100vw - 24px);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .toolbar::-webkit-scrollbar { display: none; }
+    .group { display: flex; gap: 4px; align-items: center; }
+    .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; flex: none; }
+    button {
+      font: 500 13px/1 inherit; font-family: inherit; color: var(--text); background: transparent;
+      border: 0; border-radius: 9px; padding: 9px 12px; cursor: pointer; white-space: nowrap; flex: none;
+    }
+    button:hover { background: rgba(255, 255, 255, 0.08); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button.active { background: var(--text); color: #1b1b1d; }
+    #btn-light { min-width: 92px; }
+
+    .hint {
+      position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%); font-size: 12px;
+      color: #4a4741; background: rgba(255, 255, 255, 0.55); padding: 5px 11px; border-radius: 999px;
+      white-space: nowrap; pointer-events: none;
+    }
+    body[data-lighting="evening"] .hint { color: #cfcac2; background: rgba(0, 0, 0, 0.4); }
+    body.photo .label-layer, body.photo .hint { display: none; }
+    .status {
+      position: fixed; top: 18px; left: 50%; transform: translateX(-50%); font-size: 12.5px; z-index: 12;
+      padding: 8px 14px; border-radius: 999px; white-space: nowrap; color: var(--text);
+    }
+    .status[hidden] { display: none; }
+
+    .panel {
+      position: fixed; top: 18px; right: 18px; bottom: 90px; width: min(360px, calc(100vw - 36px)); z-index: 20;
+      padding: 20px 22px; overflow-y: auto; transform: translateX(calc(100% + 30px));
+      transition: transform 0.35s cubic-bezier(.2, .8, .2, 1);
+    }
+    .panel.open { transform: none; }
+    .panel h2 { margin: 2px 0 10px; font-size: 18px; }
+    .panel h3 { margin: 22px 0 10px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+    .panel p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #ddd8cf; }
+    .panel-close { position: absolute; top: 12px; right: 10px; font-size: 18px; padding: 6px 10px; }
+    #palette { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+    #palette li { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #ddd8cf; }
+    .chip { width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.15); flex: none; }
+    #schedule { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    #schedule td { padding: 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+    #schedule td:first-child { width: 44px; color: var(--accent); font-weight: 700; }
+    .pill { display: inline-block; font-size: 10.5px; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; text-transform: none; }
+    .pill.ok { background: rgba(110, 170, 110, 0.2); color: #9fd39f; }
+    .pill.warn { background: rgba(214, 150, 70, 0.22); color: #f0bd7a; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+    .checks li { font-size: 12.5px; line-height: 1.45; padding: 7px 10px 7px 28px; border-radius: 9px; background: rgba(255, 255, 255, 0.04); position: relative; }
+    .checks li::before { position: absolute; left: 9px; top: 7px; font-weight: 700; }
+    .checks li.ok::before { content: "✓"; color: #8fcf8f; }
+    .checks li.warn::before { content: "!"; color: #f0a64f; }
+    .checks li.info::before { content: "i"; color: #8fb3d9; }
+    .checks li.warn { background: rgba(214, 150, 70, 0.1); }
+    .checks strong { display: block; color: var(--text); font-weight: 600; }
+    .checks span { color: var(--muted); }
+    .mini { list-style: none; margin: 0; padding: 0; font-size: 12.5px; color: #ddd8cf; display: grid; gap: 4px; }
+    .mini strong { color: var(--text); text-transform: capitalize; margin-right: 4px; }
+    .mini a { color: #e8b98a; }
+    .panel .row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .panel .row button, .ed-inspector-btn { background: rgba(255, 255, 255, 0.08); }
+    #btn-edit { display: block; margin-top: 12px; background: var(--accent); color: #1b1b1d; font-weight: 600; }
+    #btn-edit:hover { background: #d99b67; }
+
+    /* ── Plan editor ─────────────────────────────────────────── */
+    #editor { position: fixed; inset: 0; background: #f7f4ef; z-index: 10; color: var(--text); }
+    #editor[hidden] { display: none; }
+    #ed-svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
+    .ed-top { position: absolute; top: 14px; left: 14px; display: flex; gap: 4px; align-items: center; padding: 6px; z-index: 2; flex-wrap: wrap; max-width: calc(100vw - 28px); }
+    .ed-title { padding: 0 10px; font-size: 14px; }
+    .ed-top button.primary, #ed-inspector button.primary { background: var(--accent); color: #1b1b1d; font-weight: 600; }
+    #ed-inspector { position: absolute; top: 14px; right: 14px; bottom: 14px; width: min(330px, calc(100vw - 28px)); overflow-y: auto; padding: 14px 16px; z-index: 2; }
+    #ed-inspector h3 { margin: 16px 0 8px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    #ed-inspector h3:first-child { margin-top: 2px; font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--text); }
+    #ed-inspector .f { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; font-size: 12.5px; color: #ddd8cf; }
+    #ed-inspector .f input, #ed-inspector select { width: 110px; background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; font: inherit; }
+    #ed-inspector .f input[type=range] { padding: 0; }
+    #ed-inspector .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+    #ed-inspector .grid2 .f input { width: 64px; }
+    #ed-inspector .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    #ed-inspector .row select { width: auto; flex: 1; }
+    #ed-inspector button { background: rgba(255,255,255,0.09); font-size: 12.5px; padding: 8px 11px; }
+    #ed-inspector button.danger { color: #f1a08f; }
+    #ed-inspector .chk { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: #ddd8cf; margin: 5px 0; }
+    #ed-inspector .tip { font-size: 11.5px; color: var(--muted); margin: 6px 0; line-height: 1.45; }
+    .ed-hint { position: absolute; bottom: 16px; left: 16px; right: 360px; font-size: 12.5px; color: #4a4741; pointer-events: none; }
+    .ed-hint[hidden] { display: none; }
+    @media (max-width: 760px) {
+      #ed-inspector { top: auto; height: 42vh; left: 14px; width: auto; }
+      .ed-hint { right: 16px; bottom: calc(42vh + 22px); }
+    }
+    #schedule span { color: var(--muted); }
+
+    /* ── Split view: 2D plan docked left, live 3D right ───────── */
+    body.split #editor { right: 50%; border-right: 1px solid #d8d1c5; }
+    body.split #viewport { left: 50%; }
+    body.split .brand { left: calc(50% + 14px); top: 14px; }
+    body.split .toolbar, body.split .hint, body.split .status, body.split #selbar, body.split #toast { left: 75%; }
+    body.split .toolbar { max-width: calc(50vw - 24px); }
+    body.split #ed-inspector { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; height: 38%; }
+    body.split .ed-hint { right: 16px; bottom: calc(38% + 20px); }
+    @media (max-width: 900px) {
+      body.split #editor { right: 0; bottom: 50%; border-right: 0; border-bottom: 1px solid #d8d1c5; }
+      body.split #viewport { left: 0; top: 50%; }
+      body.split .brand { display: none; }
+      body.split .toolbar, body.split .hint, body.split .status, body.split #selbar, body.split #toast { left: 50%; }
+      body.split .toolbar { max-width: calc(100vw - 24px); }
+      body.split #ed-inspector { height: 32%; }
+      body.split .ed-top { flex-wrap: nowrap; overflow-x: auto; right: 14px; scrollbar-width: none; }
+      body.split .ed-top::-webkit-scrollbar { display: none; }
+      body.split .ed-top [data-act="close"] { order: -1; }   /* always reachable without scrolling */
+      body.split .ed-hint { left: 14px; right: 14px; bottom: calc(32% + 16px); font-size: 11px; }
+      body.split .status { top: calc(50% + 12px); }        /* photo progress shows over the 3D half */
+      body.split .panel { top: calc(50% + 10px); }
+    }
+
+    /* ── Selection bar, toast, notes ──────────────────────────── */
+    #selbar { position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px 6px; z-index: 5; max-width: calc(100vw - 24px); }
+    #selbar[hidden], body.photo #selbar { display: none; }
+    #sel-name { font-size: 13px; font-weight: 600; padding: 0 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #f6d9b8; }
+    #selbar button { padding: 8px 10px; }
+    #selbar .danger { color: #f1a08f; }
+    @media (max-width: 520px) { #selbar .lbl { display: none; } #sel-name { max-width: 130px; } }
+    #toast { position: fixed; bottom: 166px; left: 50%; transform: translateX(-50%); padding: 9px 14px; font-size: 13px; z-index: 6; max-width: min(520px, 90vw); text-align: center; }
+    #toast[hidden] { display: none; }
+    body.noting #viewport canvas { cursor: crosshair; }
+    #note-pop { position: fixed; z-index: 40; width: 330px; padding: 12px 14px; }
+    #note-pop[hidden] { display: none; }
+    @media (max-width: 520px) {   /* phones: dock at the top so the on-screen keyboard never covers it */
+      #note-pop { left: 8px !important; right: 8px; top: 8px !important; width: auto; }
+    }
+    .np-where { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+    #note-pop input { width: 100%; background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: inherit; font-size: 13.5px; }
+    .np-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0; }
+    .np-chips button { font-size: 11.5px; padding: 5px 8px; background: rgba(255,255,255,0.08); }
+    .np-row { display: flex; gap: 6px; }
+    .np-row .primary { background: var(--accent); color: #1b1b1d; font-weight: 600; }
+    .np-tip { font-size: 11px; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+    .pin3 { pointer-events: auto; position: relative; }
+    .pin3 b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #c9864f; color: #fff; font: 700 12px/1 Inter, 'Segoe UI', sans-serif; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: default; }
+    .pin3.done b { background: #5f9a64; }
+    .pin3 span { display: none; position: absolute; left: 30px; top: -4px; width: 220px; background: rgba(24,24,26,0.92); color: #f2efe9; font: 12px/1.4 Inter, 'Segoe UI', sans-serif; padding: 8px 10px; border-radius: 8px; }
+    .pin3:hover span, .pin3.open span { display: block; }
+    .pin3 em, .notes em { display: block; color: #a9a49b; font-style: normal; margin-top: 3px; font-size: 11.5px; }
+    .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .notes li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; background: rgba(255,255,255,0.05); border-radius: 9px; padding: 7px 8px; color: var(--text); }
+    .notes li b { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #c9864f; color: #fff; font-size: 11px; }
+    .notes li.done b { background: #5f9a64; }
+    .notes li span { flex: 1; }
+    .notes li button { padding: 2px 8px !important; background: none !important; color: var(--muted); }
+    .notes li.empty { display: block; color: var(--muted); }
+    .tip-dim { font-size: 11.5px !important; color: var(--muted) !important; margin-top: 8px !important; }
+
+    /* ── Asset library ────────────────────────────────────────── */
+    #library { position: fixed; z-index: 30; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(780px, calc(100vw - 24px)); height: min(660px, calc(100vh - 24px)); display: flex; flex-direction: column; padding: 14px 16px; }
+    #library[hidden] { display: none; }
+    .lib-head { display: flex; gap: 10px; align-items: center; }
+    .lib-head strong { font-size: 15px; }
+    .lib-head input { flex: 1; background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; }
+    .lib-x { font-size: 18px; padding: 4px 10px; }
+    .lib-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 10px 0; }
+    .lib-tabs button { padding: 7px 10px; font-size: 12.5px; background: rgba(255,255,255,0.05); }
+    .lib-tabs button.active { background: var(--text); color: #1b1b1d; }
+    .lib-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; align-content: start; padding-right: 4px; }
+    .lib-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; white-space: normal; position: relative; }
+    .lib-card:hover { background: rgba(201,134,79,0.22); }
+    .lib-card img { width: 100%; aspect-ratio: 1; object-fit: contain; background: radial-gradient(circle at 50% 40%, #57534d, #2c2b29); border-radius: 8px; }
+    .lib-card span { font-size: 12px; text-align: center; line-height: 1.25; }
+    .lib-card em { position: absolute; top: 12px; left: 12px; font-size: 9.5px; font-style: normal; background: rgba(201,134,79,0.9); color: #1b1b1d; padding: 2px 5px; border-radius: 5px; font-weight: 600; }
+    .lib-foot { font-size: 11.5px; color: var(--muted); margin: 10px 0 0; }
+    .lib-foot span { background: rgba(201,134,79,0.9); color: #1b1b1d; padding: 1px 5px; border-radius: 5px; font-weight: 600; }
+    .lib-empty { color: var(--muted); font-size: 13px; }
+
+    .loading {
+      position: fixed; inset: 0; display: grid; place-items: center; color: #4a4741; font-size: 14px;
+      letter-spacing: 0.04em; transition: opacity 0.5s;
+    }
+    body.ready .loading { opacity: 0; pointer-events: none; }
+    .error { color: #8b2d1d; max-width: 420px; text-align: center; line-height: 1.5; }
+
+    @media (max-width: 640px) {
+      .brand { top: 10px; left: 10px; padding: 12px 14px; }
+      .brand h1 { font-size: 18px; }
+      .toolbar { bottom: 10px; justify-content: flex-start; }
+      .hint { bottom: 68px; font-size: 11px; }
+      .panel { top: auto; right: 10px; left: 10px; width: auto; bottom: 70px; max-height: 60vh;
+        transform: translateY(calc(100% + 90px)); }
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport"></div>
+  <div class="loading" id="loading">Building your office…</div>
+
+  <header class="brand card">
+    <div class="eyebrow">Office remodel · 3D concept</div>
+    <h1 id="title">Industrial Loft</h1>
+    <p id="meta"></p>
+    <span class="badge" id="placeholder" hidden>Sample room — use Edit plan to draw or trace yours</span>
+    <button id="btn-edit" title="Open the 2D plan next to the 3D view — edits show live in both">◧ 2D plan + 3D</button>
+  </header>
+
+  <div class="hint" id="hint"></div>
+  <div class="status card" id="status" role="status" aria-live="polite" hidden></div>
+
+  <nav class="toolbar card">
+    <div class="group" id="views"></div>
+    <span class="sep"></span>
+    <div class="group">
+      <button id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+      <button id="btn-add" title="Pick furniture, lighting, plants and decor">＋ Add</button>
+      <button id="btn-note" title="Pin a note anywhere: “glass wall”, “painting”, “sofa here”…">📍 Note</button>
+      <button id="btn-light" title="Toggle daylight / evening lighting">☀ Day</button>
+      <button id="btn-dims" title="Show wall dimensions">Dimensions</button>
+      <button id="btn-notes" title="Design concept, palette and furniture schedule">Design notes</button>
+      <button id="btn-photo" title="Path-traced photorealistic render of this view">◉ Photo render</button>
+      <button id="btn-shot" title="Save the current view as an image">Save image</button>
+    </div>
+  </nav>
+
+  <aside class="panel card" id="panel">
+    <button class="panel-close" id="panel-close" aria-label="Close">×</button>
+    <div class="eyebrow">Design concept</div>
+    <h2>Industrial Loft</h2>
+    <p id="concept"></p>
+    <h3>Material palette</h3>
+    <ul id="palette"></ul>
+    <h3>Notes <span class="pill warn" id="notes-open"></span></h3>
+    <ul class="notes" id="notes-list"></ul>
+    <p class="tip-dim">Notes the app can’t apply are saved with your plan. Ask Claude in chat to do your open notes.</p>
+    <h3>Design check <span class="pill ok" id="check-summary"></span></h3>
+    <ul class="checks" id="checks"></ul>
+    <h3>Lighting targets</h3>
+    <ul class="mini" id="lighting-spec"></ul>
+    <h3>FF&amp;E schedule</h3>
+    <table id="schedule"></table>
+    <div class="row"><button id="btn-csv">Export schedule (CSV)</button></div>
+    <h3>Standards used</h3>
+    <ul class="mini" id="sources"></ul>
+  </aside>
+
+  <div id="editor" hidden></div>
+
+  <div id="selbar" class="card" role="toolbar" aria-label="Selected item" hidden>
+    <span id="sel-name"></span>
+    <button data-sa="rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate 15 degrees left">⟲</button>
+    <button data-sa="rot90" title="Rotate 90° (R)" aria-label="Rotate 90 degrees">⟳ 90°</button>
+    <button data-sa="rotr" title="Rotate +15°" aria-label="Rotate 15 degrees right">⟳</button>
+    <button data-sa="dup" title="Duplicate (Ctrl+D)" aria-label="Duplicate">⧉<span class="lbl"> Duplicate</span></button>
+    <button data-sa="del" class="danger" title="Delete (Del)" aria-label="Delete">🗑<span class="lbl"> Delete</span></button>
+    <button data-sa="none" aria-label="Deselect">✕</button>
+  </div>
+  <div id="toast" class="card" role="status" aria-live="polite" hidden></div>
+  <form id="note-pop" class="card" role="dialog" aria-label="Pin a note" hidden>
+    <div class="np-where"></div>
+    <input placeholder="What should go here? e.g. glass wall, painting, sofa" autocomplete="off" aria-label="Note">
+    <div class="np-chips"></div>
+    <div class="np-row"><button type="submit" class="primary">Pin note</button><button type="button" data-np="cancel">Cancel</button></div>
+    <p class="np-tip">Notes the app understands are applied right away. Anything else is saved for Claude to do.</p>
+  </form>
+
+  <script>
+    function showError(msg) {
+      var el = document.getElementById('loading');
+      el.innerHTML = '<div class="error"><strong>Could not load the 3D view.</strong><br>' + msg + '</div>';
+    }
+    // Capture phase also catches a script or module that fails to download (those errors don't bubble).
+    window.addEventListener('error', function (e) {
+      if (document.body.classList.contains('ready')) return;
+      var src = e.target && e.target !== window && (e.target.src || e.target.href);
+      showError(src ? 'A file failed to load: ' + src : (e.message || 'Script error'));
+    }, true);
+    setTimeout(function () {
+      if (!document.body.classList.contains('ready')) showError('Still not ready after 30 seconds. Check the internet connection, then reload the page.');
+    }, 30000);
+  </script>
+  <script type="module" src="js/main.js?v=touch3"
+    onerror="showError('Needs an internet connection (loads three.js from a CDN) and must be opened through a local server, not as a file.')"></script>
+</body>
+</html>
