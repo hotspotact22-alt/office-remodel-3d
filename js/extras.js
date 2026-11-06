@@ -421,20 +421,62 @@ X.whiteboard = (o, { M }) => {
 };
 
 // ── 7. Glass partition (Crittall style) ──────────────────────────────────────
+// Optional glass door: door = opening width (m), doorAt = distance from the left end to the door's
+// left edge (default: centred). The door leaf is drawn closed; walkways treat the opening as open.
+function partitionDoor(o) {
+  const W = o.width ?? 2.0, dw = Math.min(o.door ?? 0, W - 0.3);
+  if (!(dw >= 0.6)) return null;
+  const a = Math.max(0.15, Math.min(o.doorAt ?? (W - dw) / 2, W - dw - 0.15)) - W / 2;
+  return [a, a + dw];   // local x range of the opening
+}
 X.glassPartition = (o, { M }) => {
   const g = new THREE.Group();
   const W = o.width ?? 2.0, Hp = o.panelHeight ?? 2.2, f = 0.04, fd = 0.045, m = 0.022, md = 0.035, ch = 0.03;
-  g.add(box(W, ch, 0.1, M.steel, 0, ch / 2, 0));                                         // floor channel
-  g.add(box(W, f + 0.02, fd, M.steel, 0, ch + (f + 0.02) / 2, 0));                       // deeper bottom rail
+  const door = partitionDoor(o);
+  const y0 = ch + f + 0.02, y1 = Hp - f, rows = Math.max(1, Math.round((y1 - y0) / 0.55));
+  // Optional frosted privacy band (frostFrom → frostTo metres above the floor) on all the glass.
+  const frost = o.frostTo > (o.frostFrom ?? 0) ? [o.frostFrom ?? 0, o.frostTo] : null;
+  if (frost && !M.frosted) {
+    M.frosted = new THREE.MeshStandardMaterial({ color: '#f6f8f9', emissive: '#ffffff', emissiveIntensity: 0.06, roughness: 1, metalness: 0, transparent: true, opacity: 0.93 });
+    M.frosted.userData.frosted = true;
+  }
+  const pane = (w, h, x, y, d = 0.008) => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.glass);
+    p.position.set(x, y, 0); p.receiveShadow = true; p.renderOrder = 2;   // like room glazing: no shadow
+    g.add(p);
+    const a = frost && Math.max(frost[0], y - h / 2), b = frost && Math.min(frost[1], y + h / 2);
+    if (frost && b > a) {
+      const f2 = new THREE.Mesh(new THREE.BoxGeometry(w, b - a, d + 0.004), M.frosted);
+      f2.position.set(x, (a + b) / 2, 0); f2.receiveShadow = true; f2.renderOrder = 3;
+      g.add(f2);
+    }
+  };
+  // fixed glazing with its mullion grid between xa and xb (frame posts at both ends)
+  const fixed = (xa, xb) => {
+    g.add(box(xb - xa, ch, 0.1, M.steel, (xa + xb) / 2, ch / 2, 0));                     // floor channel
+    g.add(box(xb - xa, f + 0.02, fd, M.steel, (xa + xb) / 2, ch + (f + 0.02) / 2, 0));   // deeper bottom rail
+    for (const x of [xa + f / 2, xb - f / 2]) g.add(box(f, Hp - ch, fd, M.steel, x, ch + (Hp - ch) / 2, 0));
+    const x0 = xa + f, x1 = xb - f, cols = Math.max(1, Math.round((x1 - x0) / 0.5));
+    for (let i = 1; i < cols; i++) g.add(box(m, y1 - y0, md, M.steel, x0 + ((x1 - x0) * i) / cols, (y0 + y1) / 2, 0));
+    for (let j = 1; j < rows; j++) g.add(box(x1 - x0, m, md, M.steel, (x0 + x1) / 2, y0 + ((y1 - y0) * j) / rows, 0));
+    pane(x1 - x0 + 0.01, y1 - y0 + 0.01, (x0 + x1) / 2, (y0 + y1) / 2);
+  };
   g.add(box(W, f, fd, M.steel, 0, Hp - f / 2, 0));                                       // head
-  for (const s of [-1, 1]) g.add(box(f, Hp - ch, fd, M.steel, s * (W / 2 - f / 2), ch + (Hp - ch) / 2, 0));
-  const x0 = -W / 2 + f, x1 = W / 2 - f, y0 = ch + f + 0.02, y1 = Hp - f;
-  const cols = Math.max(1, Math.round((x1 - x0) / 0.5)), rows = Math.max(1, Math.round((y1 - y0) / 0.55));
-  for (let i = 1; i < cols; i++) g.add(box(m, y1 - y0, md, M.steel, x0 + ((x1 - x0) * i) / cols, (y0 + y1) / 2, 0));
-  for (let j = 1; j < rows; j++) g.add(box(x1 - x0, m, md, M.steel, 0, y0 + ((y1 - y0) * j) / rows, 0));
-  const pane = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 0.01, y1 - y0 + 0.01, 0.008), M.glass);
-  pane.position.y = (y0 + y1) / 2; pane.receiveShadow = true; pane.renderOrder = 2;   // like room glazing: no shadow
-  g.add(pane);
+  if (!door) { fixed(-W / 2, W / 2); return g; }
+  const [da, db] = door;
+  fixed(-W / 2, da); fixed(db, W / 2);
+  // door leaf: slim steel frame, one sheet of glass, a mid rail and a long bar pull on both faces
+  const lx0 = da + 0.012, lx1 = db - 0.012, top = Hp - f - 0.005, bot = 0.012, s = 0.035, cx = (lx0 + lx1) / 2;
+  for (const x of [lx0 + s / 2, lx1 - s / 2]) g.add(box(s, top - bot, 0.04, M.steel, x, (top + bot) / 2, 0));
+  g.add(box(lx1 - lx0, s, 0.04, M.steel, cx, top - s / 2, 0));
+  g.add(box(lx1 - lx0, s * 2, 0.04, M.steel, cx, bot + s, 0));
+  g.add(box(lx1 - lx0, s * 0.6, 0.03, M.steel, cx, 1.0, 0));
+  pane(lx1 - lx0 - 2 * s + 0.01, top - bot - 3 * s + 0.01, cx, (top + bot + s) / 2, 0.01);
+  for (const z of [-1, 1]) {
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.9, 12), M.brass);
+    bar.position.set(lx0 + 0.09, 1.05, z * 0.055); bar.castShadow = true; g.add(bar);
+    for (const y of [0.65, 1.45]) g.add(box(0.02, 0.02, 0.035, M.brass, lx0 + 0.09, y, z * 0.037));
+  }
   return g;
 };
 
@@ -659,8 +701,12 @@ export const EXTRA_CATALOG = {
   glassPartition: {
     name: 'Glass partition', spec: 'Freestanding Crittall-style partition: blackened-steel frame and mullion grid, clear glass, floor channel',
     layer: 'floor', rect: (o) => [-half(o.width ?? 2.0), -0.05, half(o.width ?? 2.0), 0.05], label: 'Glass', cat: 'Walls & partitions',
-    keywords: ['partition', 'glass partition', 'glass wall', 'divider', 'room divider', 'crittall'],
-    defaults: { width: 2.0, panelHeight: 2.2 }, params: [['width', 'Width (m)', 0.1], ['panelHeight', 'Height (m)', 0.05]],
+    // what blocks walking: the glass either side of the door opening, if there is one
+    solids: (o) => { const W = half(o.width ?? 2.0), d = partitionDoor(o); return d ? [[-W, -0.05, d[0], 0.05], [d[1], -0.05, W, 0.05]] : [[-W, -0.05, W, 0.05]]; },
+    keywords: ['partition', 'glass partition', 'glass wall', 'divider', 'room divider', 'crittall', 'glass door'],
+    defaults: { width: 2.0, panelHeight: 2.2, door: 0 },
+    params: [['width', 'Width (m)', 0.1], ['panelHeight', 'Height (m)', 0.05], ['door', 'Door width (m, 0 = none)', 0.05], ['doorAt', 'Door from left end (m)', 0.05],
+      ['frostFrom', 'Frosted band from (m)', 0.05], ['frostTo', 'Frosted band to (m, 0 = none)', 0.05]],
   },
   wallShelf: {
     name: 'Wall shelves', spec: 'Three floating reclaimed-oak shelves (25 cm deep) on slim blackened-steel brackets, books and plant',

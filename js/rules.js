@@ -1,7 +1,7 @@
 // Professional space-planning standards used by auto-furnish and the design check.
 // Values in metres unless noted. Sources are listed in the design notes panel.
 import { Grid, OUTSIDE, SOLID } from './grid.js';
-import { footprint } from './catalog.js';
+import { footprint, solidFootprints } from './catalog.js';
 import { getWalls, openingGeom, facingDeg, dirFromDeg, add, sub, mul, dot, norm, dist, len, pointInPolygon } from './planmath.js';
 
 export const RULES = {
@@ -86,8 +86,7 @@ function gridWithout(plan, skip) {
   const g = new Grid(plan.outline);
   for (const f of plan.furniture) {
     if (f === skip) continue;
-    const fp = footprint(f);
-    if (fp && fp.layer === 'floor') g.mark(fp, SOLID);
+    for (const fp of solidFootprints(f)) if (fp.layer === 'floor') g.mark(fp, SOLID);
   }
   return g;
 }

@@ -55,6 +55,17 @@ export function footprint(item) {
   return null;
 }
 
+// The parts of a piece that block walking: its footprint, or for pieces with an opening
+// (a glass partition with a door) only the solid parts.
+export function solidFootprints(item) {
+  const c = CATALOG[item.type], fp = footprint(item);
+  if (!fp || !c.solids) return fp ? [fp] : [];
+  const deg = facingDeg(item.facing);
+  return c.solids(item).map(([x0, z0, x1, z1]) => ({
+    kind: 'poly', layer: c.layer, pts: [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map((p) => localToPlan(item.at, deg, p)),
+  }));
+}
+
 // Half the width of a piece along the wall it backs onto (keeps wide pieces clear of corners).
 export function halfWidth(item) {
   const r = CATALOG[item.type]?.rect?.(item);
