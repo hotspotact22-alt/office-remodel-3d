@@ -991,7 +991,9 @@ function offerUpdatedRoom() {
     if (!a) return;
     bar.hidden = true;
     if (a === 'keep') { plan.version = samplePlan.version; savePlan(plan); return; }
+    plan.version = samplePlan.version;   // undo brings the old layout back without offering this again
     editor.checkpoint(); plan = samplePlanCopy(); savePlan(plan); setSelected(-1); build(); editor.refresh();
+    goTo('overview', true);              // the old camera spot may be outside the new walls
     toast('Showing the updated room. Undo (↶) brings your old layout back.');
   };
 }
