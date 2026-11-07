@@ -19,7 +19,7 @@ function makeCanvas(w, h) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  const x = c.getContext('2d');
+  const x = c.getContext('2d', { willReadFrequently: true });   // kept in normal memory: a GPU reset wipes GPU canvases
   return x ? [c, x] : null;
 }
 function canvasTex(c) {

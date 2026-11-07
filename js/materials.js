@@ -14,7 +14,7 @@ export function rng(seed = 1) {
 function canvas(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  return [c, c.getContext('2d')];
+  return [c, c.getContext('2d', { willReadFrequently: true })];   // kept in normal memory: a GPU reset wipes GPU canvases
 }
 
 function toTexture(c, metres, color = true) {

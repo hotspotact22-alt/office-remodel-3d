@@ -91,12 +91,31 @@ labels.domElement.className = 'label-layer';
 viewport.appendChild(labels.domElement);
 
 const scene = new THREE.Scene();
-function studioEnvironment() {
-  const pmrem = new THREE.PMREMGenerator(renderer), tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+function studioEnvironment(r = renderer) {
+  const pmrem = new THREE.PMREMGenerator(r), tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
   return tex;
 }
 scene.environment = studioEnvironment();
+// The picture a renderer last drew, as a PNG. Read back from the GPU, not with canvas.toDataURL():
+// after a graphics reset Chrome hands back a blank picture from the canvas.
+function rendererPNG(r) {
+  const gl = r.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(w * h * 4);
+  const target = r.getRenderTarget();
+  r.setRenderTarget(null);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  r.setRenderTarget(target);
+  const img = new ImageData(w, h), d = img.data;
+  for (let y = 0; y < h; y++) d.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);   // GL rows run bottom-up
+  for (let i = 3; i < d.length; i += 4) {   // GL colour is premultiplied by alpha; an image wants it straight
+    const a = d[i];
+    if (a && a < 255) for (let k = i - 3; k < i; k++) d[k] = Math.min(255, Math.round((d[k] * 255) / a));
+  }
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d', { willReadFrequently: true }).putImageData(img, 0, 0);
+  return c.toDataURL('image/png');
+}
 
 const FOV = { orbit: 42, eye: 62 };
 const camera = new THREE.PerspectiveCamera(FOV.orbit, vw() / vh(), 0.03, 200);
@@ -661,7 +680,7 @@ function wireUI() {
   $('#btn-shot').addEventListener('click', () => {
     const a = document.createElement('a');
     a.download = `office-${Date.now()}.png`;
-    a.href = renderer.domElement.toDataURL('image/png');
+    a.href = rendererPNG(renderer);
     a.click();
   });
   $('#btn-csv').addEventListener('click', () => {
@@ -739,8 +758,10 @@ async function thumbFor(type) {
     thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     thumbRenderer.setSize(160, 160);
     thumbRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-    thumbEnv = new THREE.PMREMGenerator(thumbRenderer).fromScene(new RoomEnvironment(), 0.04).texture;
+    thumbEnv = studioEnvironment(thumbRenderer);
+    thumbRenderer.domElement.addEventListener('webglcontextrestored', () => { thumbEnv = studioEnvironment(thumbRenderer); });
   }
+  if (thumbRenderer.getContext().isContextLost()) throw new Error('graphics reset');   // never cache a blank picture; retried next time
   const s = new THREE.Scene();
   s.environment = thumbEnv;   // something for metal and mirrors to reflect
   s.environmentIntensity = 0.6;
@@ -754,7 +775,7 @@ async function thumbFor(type) {
   cam.position.copy(c).add(new THREE.Vector3(0.75, 0.6, 1.2).normalize().multiplyScalar(r * 2.3));
   cam.lookAt(c);
   thumbRenderer.render(s, cam);
-  thumbCache[type] = thumbRenderer.domElement.toDataURL('image/png');
+  thumbCache[type] = rendererPNG(thumbRenderer);
   obj.traverse((o) => { if (o.isMesh && !o.userData.shared) o.geometry.dispose(); });
   return thumbCache[type];
 }
@@ -818,6 +839,23 @@ function showNotePopover(target, x, y) {
   input.focus();
 }
 document.addEventListener('mousedown', (e) => { if (!$('#note-pop').hidden && e.target.closest?.('#viewport, svg')) e.preventDefault(); }, true);
+// After a finger tap the browser also sends mouse events and a click to the same spot. When the tap
+// just opened something there (the selection bar, the note box), they must not press it or take focus.
+let tapGhost = null;
+document.addEventListener('pointerdown', () => { tapGhost = null; }, true);
+document.addEventListener('pointerup', (e) => {
+  const area = e.pointerType === 'touch' && e.target.closest?.('#viewport, #ed-svg');
+  tapGhost = area ? { area, until: performance.now() + 800 } : null;
+}, true);
+document.addEventListener('keydown', () => { tapGhost = null; }, true);
+for (const type of ['mousedown', 'mouseup', 'click']) {
+  document.addEventListener(type, (e) => {
+    const g = tapGhost;
+    if (type === 'click') tapGhost = null;   // the tap's own click ends it
+    if (!g || performance.now() > g.until || e.detail === 0 || g.area.contains(e.target)) return;   // detail 0: Enter or a script
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+}
 function hideNotePopover() { $('#note-pop').hidden = true; noteTarget = null; }
 function addNote(text) {
   if (!noteTarget || !text.trim()) return hideNotePopover();
