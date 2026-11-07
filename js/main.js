@@ -157,7 +157,7 @@ const loadHDR = (name) => (hdrCache[name] ??= new HDRLoader().loadAsync(HDRI[nam
 // photoEnv / photoExposure apply to the path-traced Photo render from inside the room
 // (dollhouse renders have no ceiling, so they keep the live exposure).
 const MODES = {
-  day:     { bg: '#e6e2db', hemi: 0.75, sun: 3.2, env: 0.45, bulb: 0.8, lamps: 0, exposure: 1.0,  photoEnv: 1.0, photoExposure: 3.4 },
+  day:     { bg: '#e6e2db', hemi: 0.75, sun: 3.2, env: 0.45, bulb: 0.8, lamps: 0, exposure: 1.0,  photoEnv: 1.0, photoExposure: 3.4, photoLitExposure: 1.6 },
   evening: { bg: '#13151a', hemi: 0.05, sun: 0,   env: 0.06, bulb: 9,   lamps: 1, exposure: 1.25, photoEnv: 0.5, photoExposure: 1.4 },
 };
 let lighting = 'day', hdr = null, inside = false;
@@ -379,10 +379,11 @@ const setStatus = (t) => { $('#status').textContent = t; $('#status').hidden = !
 function ensurePathTracer() {
   if (pathTracer) return;
   pathTracer = new WebGLPathTracer(renderer);
-  Object.assign(pathTracer, { bounces: 6, transmissiveBounces: 6, filterGlossyFactor: 0.5, minSamples: 1, renderToCanvas: false });
+  // renderDelay 0: otherwise the warm-up's single sample is skipped and never compiles the real shader
+  Object.assign(pathTracer, { bounces: 6, transmissiveBounces: 6, filterGlossyFactor: 0.5, minSamples: 1, renderToCanvas: false, renderDelay: 0 });
   pathTracer.tiles.set(2, 2);
-  // Big screens converge much faster at a slightly lower internal resolution.
-  pathTracer.renderScale = window.devicePixelRatio > 1.25 ? 0.75 : 1;
+  // Big screens converge much faster at a slightly lower internal resolution; phones lower still.
+  pathTracer.renderScale = LOW ? 0.6 : window.devicePixelRatio > 1.25 ? 0.75 : 1;
 }
 
 // The path tracer can only light from an equirectangular sky. If the HDRI could not download
@@ -412,44 +413,89 @@ function usePhotoEnvironment(on) {
   else if (liveEnvironment) { scene.environment = hdr ?? liveEnvironment; liveEnvironment = null; }
 }
 
+// Photo lighting. A real office has its lights on in the daytime too, so the room's lamps come
+// on. A light wrapped in geometry (inside a glass globe or a bulb) can only escape by chance,
+// which shows as white speckle: clear glass is left out of the photo (see startPhoto) and a
+// light inside a bulb moves to just below it.
+let photoLamps = null;
+function photoLights(on) {
+  for (const [light, intensity, position] of photoLamps ?? []) { light.intensity = intensity; light.position.copy(position); }
+  photoLamps = null;
+  if (!on) return;
+  photoLamps = world.lamps.map(({ light }) => [light, light.intensity, light.position.clone()]);
+  scene.updateMatrixWorld();
+  const bulbs = [];
+  scene.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3());
+    if (Math.max(s.x, s.y, s.z) < 0.15) bulbs.push(b);
+  });
+  for (const { light, intensity } of world.lamps) {
+    light.intensity = intensity;
+    const p = light.getWorldPosition(new THREE.Vector3());
+    const around = bulbs.filter((b) => b.containsPoint(p));
+    if (!around.length) continue;
+    p.y = Math.min(...around.map((b) => b.min.y)) - 0.01;
+    light.position.copy(light.parent.worldToLocal(p));
+  }
+}
+
 // Compile the path-tracing shader in the background once the page is idle, so the
 // first Photo render starts in seconds instead of ~30 s.
 async function prewarmPathTracer() {
   await Promise.all([M.ready, loadHDR(lighting)]);
+  // the build freezes the page for seconds: wait until nothing is being dragged, moved or pressed
+  while (!photo && (drag3 || editor.dragging || tween || keys.size || performance.now() < activeUntil)) await new Promise((r) => setTimeout(r, 1000));
   if (photo || glLost) return;
   ensurePathTracer();
-  usePhotoEnvironment(true);
+  photoScene(true);   // the photo's own scene, or Photo would have to compile the shader all over again
   try { pathTracer.setScene(scene, camera); pathTracer.renderSample(); }
-  finally { usePhotoEnvironment(false); }
+  finally { photoScene(false); }
 }
 
+// What the photo changes in the scene, undone by photoScene(false). Cut-away walls/ceiling
+// (invisible-but-shadowing in the live view) and clear glass on models (lamp globes, picture
+// glass: see photoLights) are left out, and the alpha glass becomes physically transmissive
+// glass so panes stay visible and let light through.
+function photoScene(on) {
+  photoLights(false);
+  photoHidden.forEach((o) => (o.visible = true));
+  photoSwapped.forEach((o) => (o.material = M.glass));
+  photoHidden = []; photoSwapped = [];
+  usePhotoEnvironment(false);
+  if (!on) return;
+  scene.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    if (o.material === ghost || /_glass$/.test([].concat(o.material)[0]?.name ?? '')) { o.visible = false; photoHidden.push(o); }
+    else if (o.material === M.glass) { o.material = glassPT; photoSwapped.push(o); }
+  });
+  photoLights(true);
+  usePhotoEnvironment(true);
+}
+
+let photoRun = 0;   // each start gets a number; a run that was stopped (and maybe restarted) never resumes
 async function startPhoto() {
   if (photo || glLost) return;   // no Photo while the graphics card is resetting
   if (tween) { tween.start = -Infinity; stepTween(performance.now()); }   // finish any camera move first
+  const run = ++photoRun;
   photo = true; ptReady = false;
   document.body.classList.add('photo');
   $('#btn-photo').classList.add('active');
   setStatus('Loading materials…');
   await Promise.all([M.ready, loadHDR(lighting), Promise.race([modelsReady(), new Promise((r) => setTimeout(r, 20000))])]);
-  if (!photo) return;
+  if (!photo || run !== photoRun) return;
   if (selBox) selBox.visible = false;
   controls.update();
   updateCutaway();
-  // Remove cut-away walls/ceiling (invisible-but-shadowing in the live view), and swap the
-  // alpha glass for physically transmissive glass so panes stay visible and let light through.
-  scene.traverse((o) => {
-    if (!o.isMesh || !o.visible) return;
-    if (o.material === ghost) { o.visible = false; photoHidden.push(o); }
-    else if (o.material === M.glass) { o.material = glassPT; photoSwapped.push(o); }
-  });
+  photoScene(true);
   const m = lightMode();
   scene.environmentIntensity = m.photoEnv;
-  photoExposure = inside ? m.photoExposure : m.exposure;
+  // daylight alone needs a high exposure; with the lamps switched on (see photoLights) much less
+  photoExposure = !inside ? m.exposure : m.lamps === 0 && world.lamps.length ? m.photoLitExposure : m.photoExposure;
   ensurePathTracer();
   setStatus('Preparing scene…');
   await new Promise((r) => setTimeout(r, 50));          // let the status paint before the blocking build
-  if (!photo) return;                                    // cancelled meanwhile: skip the multi-second build
-  usePhotoEnvironment(true);
+  if (!photo || run !== photoRun) return;                // cancelled meanwhile: skip the multi-second build
   pathTracer.setScene(scene, camera);
   if (!photo) return;
   ptReady = true;
@@ -458,11 +504,8 @@ async function startPhoto() {
 function stopPhoto() {
   if (!photo) return;
   photo = ptReady = false;
-  photoHidden.forEach((o) => (o.visible = true));
-  photoHidden = [];
-  photoSwapped.forEach((o) => (o.material = M.glass));
-  photoSwapped = [];
-  usePhotoEnvironment(false);
+  photoRun++;
+  photoScene(false);
   if (selBox) selBox.visible = true;
   const m = lightMode();
   scene.environmentIntensity = m.env;
@@ -475,7 +518,8 @@ controls.addEventListener('start', stopPhoto);
 
 // Past this the image no longer visibly improves (the denoiser is fully off from 400), so the
 // path tracer stops and the finished photo is only redrawn, sparing the GPU and battery.
-let photoSamples = 500;
+// Phones stop at 250 with a little smoothing left: each sample costs them far more.
+let photoSamples = LOW ? 250 : 500;
 const photoDone = () => !!pathTracer && pathTracer.samples >= photoSamples;
 function renderPhotoFrame() {
   if (!photoDone()) pathTracer.renderSample();
@@ -732,6 +776,7 @@ const editor = createEditor({
   onSelect: (sel) => setSelected(sel?.kind === 'item' ? sel.i : -1, { fromEditor: true }),
   onLibrary: () => library.open(),
   onNote: (target, x, y) => showNotePopover(target, x, y),
+  busy: () => !!drag3,
 });
 function openEditor() {
   editorOpen = true;
@@ -840,7 +885,8 @@ function describe(t) {
   return t.kind === 'ceiling' ? 'On the ceiling' : 'On the floor';
 }
 function showNotePopover(target, x, y) {
-  noteTarget = target;
+  // a piece is remembered by itself, not its place in the list, which can shift while the box is open
+  noteTarget = target.kind === 'item' ? { ...target, ref: plan.furniture[target.i] } : target;
   const pop = $('#note-pop');
   pop.querySelector('.np-where').textContent = describe(target);
   pop.querySelector('.np-chips').innerHTML = (NOTE_SUGGESTIONS[target.kind] ?? []).map((c) => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join('');
@@ -873,6 +919,11 @@ for (const type of ['mousedown', 'mouseup', 'click']) {
 function hideNotePopover() { $('#note-pop').hidden = true; noteTarget = null; }
 function addNote(text) {
   if (!noteTarget || !text.trim()) return hideNotePopover();
+  if (noteTarget.kind === 'item') {
+    const i = plan.furniture.indexOf(noteTarget.ref);
+    if (i < 0) { hideNotePopover(); toast('That piece changed while the note was open — pin the note again.'); return; }
+    noteTarget = { kind: 'item', i };
+  }
   editor.checkpoint();
   plan.notes ??= [];
   const note = { id: Date.now(), text: text.trim(), target: noteTarget, created: new Date().toISOString() };

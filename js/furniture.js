@@ -387,7 +387,7 @@ B.downlight = (o, ctx) => {
   const lens = new THREE.Mesh(new THREE.CircleGeometry(0.048, 24), M.bulb);
   lens.rotation.x = Math.PI / 2; lens.position.y = H - 0.162;
   g.add(lens);
-  const light = new THREE.SpotLight('#ffc994', 0, 0, Math.PI * 0.3, 0.7, 2);
+  const light = new THREE.SpotLight('#ffd9b5', 0, 0, Math.PI * 0.3, 0.7, 2);   // warm white, about 3300 K
   light.position.y = H - 0.17;
   g.add(light, light.target);   // target at the group origin = the floor below
   ctx.lamps.push({ light, intensity: o.intensity ?? 14 });

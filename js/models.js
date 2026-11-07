@@ -165,7 +165,7 @@ for (const [id, [name, cat, layer, [w, d, h], keywords]] of Object.entries(TABLE
     wrap.add(ph);
     let light = null;
     if (cat === 'Lighting') {
-      light = new THREE.PointLight('#ffb36b', 0, 0, 2);
+      light = new THREE.PointLight('#ffd9b5', 0, 0, 2);   // warm white, about 3300 K
       light.position.set(0, layer === 'ceiling' ? H - h + 0.12 : layer === 'wall' ? y0 + h * 0.4 : y0 + h * 0.75, layer === 'wall' ? d * 0.7 : 0);
       wrap.add(light);
       ctx.lamps.push({ light, intensity: layer === 'ceiling' ? 4 : 1.6 });

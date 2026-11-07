@@ -66,7 +66,7 @@ export function snapToWall(plan, p, reach = 1.2, half = 0.12) {
 const HANGING = new Set(['pendant', 'downlight']);
 const CAT_FILL = { Seating: '#9a5a2e', Tables: '#b8915f', Storage: '#8a7a66', Kitchen: '#6f6a63', Lighting: '#e0b45c', Plants: '#5c8a4e', Decor: '#c96f3b', Tech: '#3c4148', 'Walls & partitions': '#7d93a3' };
 
-export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, onLive = () => {}, onSelect = () => {}, onLibrary = () => {}, onNote = () => {} }) {
+export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, onLive = () => {}, onSelect = () => {}, onLibrary = () => {}, onNote = () => {}, busy = () => false }) {
   const root = document.getElementById('editor');
   root.innerHTML = TEMPLATE;
   const svg = root.querySelector('#ed-svg');
@@ -760,8 +760,8 @@ export function createEditor({ getPlan, setPlan, onChange, onClose, samplePlan, 
   }, { passive: false });
 
   window.addEventListener('keydown', (e) => {
-    if (!isOpen || e.target.closest('input, select, textarea')) return;
-    if (drag && drag.kind !== 'pan') return;   // no deletes/undos while something is being dragged
+    if (!isOpen || e.target.closest?.('input, select, textarea')) return;
+    if ((drag && drag.kind !== 'pan') || busy()) return;   // no deletes/undos while something is being dragged (here or in 3D)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? restore(redo, undo) : restore(undo, redo); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); restore(redo, undo); return; }
     if (e.key === 'Escape') { mode = null; drawPts = []; calPts = []; sel = null; render(); renderInspector(); defaultHint(); return; }
