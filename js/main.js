@@ -43,14 +43,15 @@ function loadPlan() {
   }
   return samplePlanCopy();
 }
-let saveFailing = false;
+let saveWarnedAt = -Infinity;
 function savePlan(p) {
-  try { localStorage.setItem(STORE, JSON.stringify(p)); saveFailing = false; }
+  try { localStorage.setItem(STORE, JSON.stringify(p)); saveWarnedAt = -Infinity; }
   catch (e) {
     console.warn('Could not save plan', e);
-    // say so once (until saving works again): otherwise the edits look kept but are gone on reload
-    if (!saveFailing) toast('Your changes can’t be saved — this browser’s storage is full or blocked. Open the 2D plan and use Export JSON to keep a copy.', 12000);
-    saveFailing = true;
+    // otherwise the edits look kept but are gone on reload; held on screen, repeated at most once a minute
+    if (performance.now() - saveWarnedAt < 60000) return;
+    saveWarnedAt = performance.now();
+    toast('Your changes can’t be saved — this browser’s storage is full or blocked. Open the 2D plan and use Export JSON to keep a copy.', 12000, true);
   }
 }
 let plan = loadPlan();
@@ -687,6 +688,7 @@ function wireUI() {
   });
   $('#panel-close').addEventListener('click', () => { $('#panel').classList.remove('open'); $('#btn-notes').classList.remove('active'); });
   $('#btn-shot').addEventListener('click', () => {
+    if (glLost) { toast('The graphics are restarting — try again in a moment.'); return; }
     const a = document.createElement('a');
     a.download = `office-${Date.now()}.png`;
     a.href = rendererPNG(renderer);
@@ -813,7 +815,10 @@ function addFromLibrary(type) {
 }
 
 let toastTimer = null;
-function toast(text, ms = 4200) {
+let toastHeldUntil = 0;
+function toast(text, ms = 4200, hold = false) {   // hold: no ordinary toast replaces it while it shows
+  if (!hold && performance.now() < toastHeldUntil) return;
+  if (hold) toastHeldUntil = performance.now() + ms;
   const el = $('#toast');
   el.textContent = text; el.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.hidden = true), ms);
@@ -853,7 +858,7 @@ document.addEventListener('mousedown', (e) => { if (!$('#note-pop').hidden && e.
 let tapGhost = null;
 document.addEventListener('pointerdown', () => { tapGhost = null; }, true);
 document.addEventListener('pointerup', (e) => {
-  const area = e.pointerType === 'touch' && e.target.closest?.('#viewport, #ed-svg');
+  const area = e.pointerType !== 'mouse' && e.target.closest?.('#viewport, #ed-svg');   // finger or pen, as the tap handlers treat them
   tapGhost = area ? { area, until: performance.now() + 800 } : null;
 }, true);
 document.addEventListener('keydown', () => { tapGhost = null; }, true);
