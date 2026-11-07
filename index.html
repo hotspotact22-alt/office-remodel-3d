@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Office Remodel — 3D Design</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23c9864f%22/%3E%3Cpath d=%22M8 24V12l8-5 8 5v12h-6v-7h-4v7z%22 fill=%22%231b1b1d%22/%3E%3C/svg%3E">
-  <!-- Release tag (?v=r14, here and on js/main.js below): change it on every release so browsers
+  <!-- Release tag (?v=r15, here and on js/main.js below): change it on every release so browsers
        that keep old copies of the scripts (phones do) load the new ones after a single reload. -->
   <script type="importmap">
     {
@@ -15,20 +15,20 @@
         "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
         "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
         "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.28/build/index.module.js",
-        "./plan.js": "./plan.js?v=r14",
-        "./js/catalog.js": "./js/catalog.js?v=r14",
-        "./js/editor.js": "./js/editor.js?v=r14",
-        "./js/extras.js": "./js/extras.js?v=r14",
-        "./js/furniture.js": "./js/furniture.js?v=r14",
-        "./js/grid.js": "./js/grid.js?v=r14",
-        "./js/layout.js": "./js/layout.js?v=r14",
-        "./js/library.js": "./js/library.js?v=r14",
-        "./js/materials.js": "./js/materials.js?v=r14",
-        "./js/models.js": "./js/models.js?v=r14",
-        "./js/notes.js": "./js/notes.js?v=r14",
-        "./js/planmath.js": "./js/planmath.js?v=r14",
-        "./js/room.js": "./js/room.js?v=r14",
-        "./js/rules.js": "./js/rules.js?v=r14"
+        "./plan.js": "./plan.js?v=r15",
+        "./js/catalog.js": "./js/catalog.js?v=r15",
+        "./js/editor.js": "./js/editor.js?v=r15",
+        "./js/extras.js": "./js/extras.js?v=r15",
+        "./js/furniture.js": "./js/furniture.js?v=r15",
+        "./js/grid.js": "./js/grid.js?v=r15",
+        "./js/layout.js": "./js/layout.js?v=r15",
+        "./js/library.js": "./js/library.js?v=r15",
+        "./js/materials.js": "./js/materials.js?v=r15",
+        "./js/models.js": "./js/models.js?v=r15",
+        "./js/notes.js": "./js/notes.js?v=r15",
+        "./js/planmath.js": "./js/planmath.js?v=r15",
+        "./js/room.js": "./js/room.js?v=r15",
+        "./js/rules.js": "./js/rules.js?v=r15"
       }
     }
   </script>
@@ -79,6 +79,7 @@
     button {
       font: 500 13px/1 inherit; font-family: inherit; color: var(--text); background: transparent;
       border: 0; border-radius: 9px; padding: 9px 12px; cursor: pointer; white-space: nowrap; flex: none;
+      touch-action: manipulation;   /* quick repeat taps (rotate, undo) never zoom the page on iPhone */
     }
     button:hover { background: rgba(255, 255, 255, 0.08); }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -230,7 +231,7 @@
     .tip-dim { font-size: 11.5px !important; color: var(--muted) !important; margin-top: 8px !important; }
 
     /* ── Asset library ────────────────────────────────────────── */
-    #library { position: fixed; z-index: 30; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(780px, calc(100vw - 24px)); height: min(660px, calc(100vh - 24px)); display: flex; flex-direction: column; padding: 14px 16px; }
+    #library { position: fixed; z-index: 30; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(780px, calc(100vw - 24px)); height: min(660px, calc(100vh - 24px)); height: min(660px, calc(100dvh - 24px)); display: flex; flex-direction: column; padding: 14px 16px; }
     #library[hidden] { display: none; }
     .lib-head { display: flex; gap: 10px; align-items: center; }
     .lib-head strong { font-size: 15px; }
@@ -365,7 +366,7 @@
       if (!document.body.classList.contains('ready')) showError('Still not ready after 30 seconds. Check the internet connection, then reload the page.');
     }, 30000);
   </script>
-  <script type="module" src="js/main.js?v=r14"
+  <script type="module" src="js/main.js?v=r15"
     onerror="showError('Needs an internet connection (loads three.js from a CDN) and must be opened through a local server, not as a file.')"></script>
 </body>
 </html>

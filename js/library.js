@@ -60,7 +60,10 @@ export function createLibrary({ onPick, thumbFor }) {
   el.querySelector('.lib-x').addEventListener('click', () => close());
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) close(); });
 
-  function open() { el.hidden = false; drawTabs(); drawGrid(); search.focus(); }
+  function open() {
+    el.hidden = false; drawTabs(); drawGrid();
+    if (!window.matchMedia?.('(pointer: coarse)').matches) search.focus();   // on phones the keyboard would cover the cards
+  }
   function close() { el.hidden = true; }
   return { open, close, get isOpen() { return !el.hidden; } };
 }
