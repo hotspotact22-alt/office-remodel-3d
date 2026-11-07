@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Office Remodel — 3D Design</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23c9864f%22/%3E%3Cpath d=%22M8 24V12l8-5 8 5v12h-6v-7h-4v7z%22 fill=%22%231b1b1d%22/%3E%3C/svg%3E">
-  <!-- Release tag (?v=r15, here and on js/main.js below): change it on every release so browsers
+  <!-- Release tag (?v=r16, here and on js/main.js below): change it on every release so browsers
        that keep old copies of the scripts (phones do) load the new ones after a single reload. -->
   <script type="importmap">
     {
@@ -15,20 +15,20 @@
         "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
         "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/build/index.module.js",
         "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.28/build/index.module.js",
-        "./plan.js": "./plan.js?v=r15",
-        "./js/catalog.js": "./js/catalog.js?v=r15",
-        "./js/editor.js": "./js/editor.js?v=r15",
-        "./js/extras.js": "./js/extras.js?v=r15",
-        "./js/furniture.js": "./js/furniture.js?v=r15",
-        "./js/grid.js": "./js/grid.js?v=r15",
-        "./js/layout.js": "./js/layout.js?v=r15",
-        "./js/library.js": "./js/library.js?v=r15",
-        "./js/materials.js": "./js/materials.js?v=r15",
-        "./js/models.js": "./js/models.js?v=r15",
-        "./js/notes.js": "./js/notes.js?v=r15",
-        "./js/planmath.js": "./js/planmath.js?v=r15",
-        "./js/room.js": "./js/room.js?v=r15",
-        "./js/rules.js": "./js/rules.js?v=r15"
+        "./plan.js": "./plan.js?v=r16",
+        "./js/catalog.js": "./js/catalog.js?v=r16",
+        "./js/editor.js": "./js/editor.js?v=r16",
+        "./js/extras.js": "./js/extras.js?v=r16",
+        "./js/furniture.js": "./js/furniture.js?v=r16",
+        "./js/grid.js": "./js/grid.js?v=r16",
+        "./js/layout.js": "./js/layout.js?v=r16",
+        "./js/library.js": "./js/library.js?v=r16",
+        "./js/materials.js": "./js/materials.js?v=r16",
+        "./js/models.js": "./js/models.js?v=r16",
+        "./js/notes.js": "./js/notes.js?v=r16",
+        "./js/planmath.js": "./js/planmath.js?v=r16",
+        "./js/room.js": "./js/room.js?v=r16",
+        "./js/rules.js": "./js/rules.js?v=r16"
       }
     }
   </script>
@@ -88,8 +88,8 @@
 
     .hint {
       position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%); font-size: 12px;
-      color: #4a4741; background: rgba(255, 255, 255, 0.55); padding: 5px 11px; border-radius: 999px;
-      white-space: nowrap; pointer-events: none;
+      color: #4a4741; background: rgba(255, 255, 255, 0.55); padding: 5px 11px; border-radius: 16px;
+      width: max-content; max-width: calc(100vw - 24px); text-align: center; pointer-events: none;   /* wraps on narrow phones */
     }
     body[data-lighting="evening"] .hint { color: #cfcac2; background: rgba(0, 0, 0, 0.4); }
     body.photo .label-layer, body.photo .hint { display: none; }
@@ -169,22 +169,31 @@
     body.split #viewport { left: 50%; }
     body.split .brand { left: calc(50% + 14px); top: 14px; }
     body.split .toolbar, body.split .hint, body.split .status, body.split #selbar, body.split #toast { left: 75%; }
-    body.split .toolbar { max-width: calc(50vw - 24px); }
+    body.split .toolbar, body.split .hint { max-width: calc(50vw - 24px); }
     body.split #ed-inspector { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; height: 38%; }
     body.split .ed-hint { right: 16px; bottom: calc(38% + 20px); }
-    @media (max-width: 900px) {
-      body.split #editor { right: 0; bottom: 50%; border-right: 0; border-bottom: 1px solid #d8d1c5; }
-      body.split #viewport { left: 0; top: 50%; }
+    @media (max-width: 900px) {   /* phones and small tablets, either way up */
       body.split .brand { display: none; }
-      body.split .toolbar, body.split .hint, body.split .status, body.split #selbar, body.split #toast { left: 50%; }
-      body.split .toolbar { max-width: calc(100vw - 24px); }
-      body.split #ed-inspector { height: 32%; }
       body.split .ed-top { flex-wrap: nowrap; overflow-x: auto; right: 14px; scrollbar-width: none; }
       body.split .ed-top::-webkit-scrollbar { display: none; }
       body.split .ed-top [data-act="close"] { order: -1; }   /* always reachable without scrolling */
-      body.split .ed-hint { left: 14px; right: 14px; bottom: calc(32% + 16px); font-size: 11px; }
+      body.split .ed-hint { font-size: 11px; }
+    }
+    /* upright: plan on top, 3D below (a phone on its side keeps them side by side — stacked, the plan got ~40 px) */
+    @media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) {
+      body.split #editor { right: 0; bottom: 50%; border-right: 0; border-bottom: 1px solid #d8d1c5; }
+      body.split #viewport { left: 0; top: 50%; }
+      body.split .toolbar, body.split .hint, body.split .status, body.split #selbar, body.split #toast { left: 50%; }
+      body.split .toolbar, body.split .hint { max-width: calc(100vw - 24px); }
+      body.split #ed-inspector { height: 32%; }
+      body.split .ed-hint { left: 14px; right: 14px; bottom: calc(32% + 16px); }
       body.split .status { top: calc(50% + 12px); }        /* photo progress shows over the 3D half */
       body.split .panel { top: calc(50% + 10px); }
+    }
+    @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {   /* phone on its side */
+      body.split #selbar .lbl { display: none; }
+      body.split #sel-name { max-width: 110px; }
+      body.split #selbar { bottom: 136px; }   /* clear of the hint, which wraps to two lines in the narrow 3D half */
     }
 
     /* ── Selection bar, toast, notes ──────────────────────────── */
@@ -200,7 +209,7 @@
     #newroom[hidden], #gpulost[hidden] { display: none; }
     #newroom .primary, #gpulost .primary { background: var(--accent); color: #1b1b1d; font-weight: 600; }
     body.split #newroom, body.split #gpulost { left: 75%; max-width: calc(50vw - 24px); }   /* over the 3D half */
-    @media (max-width: 900px) { body.split #newroom, body.split #gpulost { left: 50%; top: calc(50% + 12px); max-width: calc(100vw - 24px); } }
+    @media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) { body.split #newroom, body.split #gpulost { left: 50%; top: calc(50% + 12px); max-width: calc(100vw - 24px); } }
     @media (max-width: 640px) { #newroom, #gpulost { top: 10px; } }   /* above the brand card, clear of the selection bar */
     body.noting #viewport canvas { cursor: crosshair; }
     #note-pop { position: fixed; z-index: 40; width: 330px; padding: 12px 14px; }
@@ -366,7 +375,7 @@
       if (!document.body.classList.contains('ready')) showError('Still not ready after 30 seconds. Check the internet connection, then reload the page.');
     }, 30000);
   </script>
-  <script type="module" src="js/main.js?v=r15"
+  <script type="module" src="js/main.js?v=r16"
     onerror="showError('Needs an internet connection (loads three.js from a CDN) and must be opened through a local server, not as a file.')"></script>
 </body>
 </html>

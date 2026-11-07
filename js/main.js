@@ -43,7 +43,16 @@ function loadPlan() {
   }
   return samplePlanCopy();
 }
-function savePlan(p) { try { localStorage.setItem(STORE, JSON.stringify(p)); } catch (e) { console.warn('Could not save plan', e); } }
+let saveFailing = false;
+function savePlan(p) {
+  try { localStorage.setItem(STORE, JSON.stringify(p)); saveFailing = false; }
+  catch (e) {
+    console.warn('Could not save plan', e);
+    // say so once (until saving works again): otherwise the edits look kept but are gone on reload
+    if (!saveFailing) toast('Your changes can’t be saved — this browser’s storage is full or blocked. Open the 2D plan and use Export JSON to keep a copy.', 12000);
+    saveFailing = true;
+  }
+}
 let plan = loadPlan();
 
 // ── Renderer / scene ────────────────────────────────────────────────────────
@@ -804,10 +813,10 @@ function addFromLibrary(type) {
 }
 
 let toastTimer = null;
-function toast(text) {
+function toast(text, ms = 4200) {
   const el = $('#toast');
   el.textContent = text; el.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.hidden = true), 4200);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (el.hidden = true), ms);
 }
 
 // ── Notes: click anywhere, type what you want ───────────────────────────────
